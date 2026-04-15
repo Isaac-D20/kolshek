@@ -22,3 +22,16 @@ export function useToggleAccountExclusion() {
     },
   });
 }
+
+export function usePurgeAccountData() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (accountId: number) =>
+      api.delete<{ id: number; transactionsDeleted: number }>(`/api/v2/accounts/${accountId}/data`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.accounts.balance() });
+      qc.invalidateQueries({ queryKey: queryKeys.providers.list() });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    },
+  });
+}

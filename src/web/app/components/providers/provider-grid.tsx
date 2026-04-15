@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useToggleAccountExclusion } from "@/hooks/use-accounts";
+import { useToggleAccountExclusion, usePurgeAccountData } from "@/hooks/use-accounts";
 import type { ProviderCard as ProviderCardType, ProviderAccount } from "@/types/api";
 
 // Mask account number to show only last 4 digits
@@ -96,50 +96,111 @@ function DeleteConfirmDialog({
   );
 }
 
-// Account row with exclusion toggle
+// Confirmation dialog for purging account data
+function PurgeConfirmDialog({
+  account,
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  account: ProviderAccount | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete Account Data</DialogTitle>
+          <DialogDescription>
+            Permanently delete all transaction data for account{" "}
+            <span className="font-medium">
+              {account ? maskAccountNumber(account.accountNumber) : ""}
+            </span>
+            ? This cannot be undone. The account will remain excluded from syncing.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button variant="destructive" onClick={onConfirm}>
+            Delete Data
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Account row with exclusion toggle and purge action
 function AccountRow({ account }: { account: ProviderAccount }) {
   const toggleExclusion = useToggleAccountExclusion();
+  const purge = usePurgeAccountData();
+  const [showPurge, setShowPurge] = useState(false);
 
   return (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[13px]",
-        account.excluded && "opacity-50"
-      )}
-    >
-      <span className="truncate text-muted-foreground">
-        {maskAccountNumber(account.accountNumber)}
-      </span>
-      <div className="flex items-center gap-2 shrink-0">
-        {account.balance != null && (
-          <span className={cn("text-xs tabular-nums", account.excluded && "line-through")}>
-            {account.balance.toLocaleString("en-IL", {
-              style: "currency",
-              currency: account.currency || "ILS",
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            })}
-          </span>
+    <>
+      <div
+        className={cn(
+          "flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[13px]",
+          account.excluded && "opacity-50"
         )}
-        <button
-          type="button"
-          onClick={() =>
-            toggleExclusion.mutate({
-              accountId: account.id,
-              excluded: !account.excluded,
-            })
-          }
-          className="p-0.5 rounded hover:bg-muted/80 text-muted-foreground transition-colors"
-          title={account.excluded ? "Include in syncing" : "Exclude from syncing"}
-        >
-          {account.excluded ? (
-            <EyeOff className="h-3.5 w-3.5" />
-          ) : (
-            <Eye className="h-3.5 w-3.5" />
+      >
+        <span className="truncate text-muted-foreground">
+          {maskAccountNumber(account.accountNumber)}
+        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          {account.balance != null && (
+            <span className={cn("text-xs tabular-nums", account.excluded && "line-through")}>
+              {account.balance.toLocaleString("en-IL", {
+                style: "currency",
+                currency: account.currency || "ILS",
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })}
+            </span>
           )}
-        </button>
+          {account.excluded && (
+            <button
+              type="button"
+              onClick={() => setShowPurge(true)}
+              className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+              title="Delete transaction data"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              toggleExclusion.mutate({
+                accountId: account.id,
+                excluded: !account.excluded,
+              })
+            }
+            className="p-0.5 rounded hover:bg-muted/80 text-muted-foreground transition-colors"
+            title={account.excluded ? "Include in syncing" : "Exclude from syncing"}
+          >
+            {account.excluded ? (
+              <EyeOff className="h-3.5 w-3.5" />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
       </div>
-    </div>
+      <PurgeConfirmDialog
+        account={account}
+        open={showPurge}
+        onOpenChange={setShowPurge}
+        onConfirm={() => {
+          purge.mutate(account.id);
+          setShowPurge(false);
+        }}
+      />
+    </>
   );
 }
 

@@ -138,6 +138,22 @@ export function isAccountExcludedByKey(
   return row?.excluded === 1;
 }
 
+export function purgeAccountData(id: number): { purged: boolean; transactionsDeleted: number } {
+  const db = getDatabase();
+  const row = db
+    .prepare("SELECT id FROM accounts WHERE id = $id")
+    .get({ $id: id }) as { id: number } | null;
+  if (!row) return { purged: false, transactionsDeleted: 0 };
+
+  const deleteResult = db
+    .prepare("DELETE FROM transactions WHERE account_id = $id")
+    .run({ $id: id });
+  db.prepare("UPDATE accounts SET balance = NULL, excluded = 1 WHERE id = $id").run({
+    $id: id,
+  });
+  return { purged: true, transactionsDeleted: deleteResult.changes };
+}
+
 // Pre-create an account marked as excluded (used during provider setup).
 export function createExcludedAccount(
   providerId: number,

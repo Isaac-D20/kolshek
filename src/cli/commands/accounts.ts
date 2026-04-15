@@ -3,12 +3,14 @@
 // kolshek accounts include <id> — Re-include a previously excluded account.
 
 import type { Command } from "commander";
+import { confirm } from "@inquirer/prompts";
 import {
   isJsonMode,
   printJson,
   jsonSuccess,
   info,
   success,
+  warn,
   createTable,
   formatCurrency,
   formatAccountNumber,
@@ -18,7 +20,9 @@ import { getDatabase } from "../../db/database.js";
 import {
   getAccount,
   updateAccountExcluded,
+  purgeAccountData,
 } from "../../db/repositories/accounts.js";
+import { countTransactions } from "../../db/repositories/transactions.js";
 
 interface AccountWithProviderRow {
   id: number;
@@ -194,6 +198,51 @@ export function registerAccountsCommand(program: Command): void {
         printJson(jsonSuccess({ id, excluded: false }));
       } else {
         success(`Account ${id} (${account.accountNumber}) re-included for syncing.`);
+      }
+    });
+
+  // accounts purge <id>
+  cmd
+    .command("purge <id>")
+    .description("Delete all transaction data for an account")
+    .action(async (idStr: string) => {
+      const id = parseInt(idStr, 10);
+      if (isNaN(id)) {
+        console.error("Invalid account ID.");
+        process.exit(2);
+      }
+      const account = getAccount(id);
+      if (!account) {
+        console.error(`Account ${id} not found.`);
+        process.exit(1);
+      }
+      const txCount = countTransactions({ accountId: id });
+      if (txCount === 0) {
+        info(`Account ${id} (${formatAccountNumber(account.accountNumber, true)}) has no transactions to delete.`);
+        return;
+      }
+
+      if (!isJsonMode()) {
+        warn(
+          `This will permanently delete ${txCount.toLocaleString()} transaction(s) for account ${formatAccountNumber(account.accountNumber, true)}.`,
+        );
+        const ok = await confirm({
+          message: "Continue?",
+          default: false,
+        });
+        if (!ok) {
+          info("Cancelled.");
+          return;
+        }
+      }
+
+      const result = purgeAccountData(id);
+      if (isJsonMode()) {
+        printJson(jsonSuccess({ id, transactionsDeleted: result.transactionsDeleted }));
+      } else {
+        success(
+          `Purged ${result.transactionsDeleted.toLocaleString()} transaction(s) from account ${id}. Account is now excluded.`,
+        );
       }
     });
 }

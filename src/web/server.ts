@@ -33,6 +33,7 @@ import {
   getAccountsByProvider,
   getAccount,
   updateAccountExcluded,
+  purgeAccountData,
 } from "../db/repositories/accounts.js";
 import {
   getLatestCompletedSyncLog,
@@ -584,6 +585,23 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("ACCOUNT_UPDATE_FAILED", msg, 500);
+          }
+        }
+
+        // DELETE /api/v2/accounts/:id/data — purge all transactions for an account
+        const accountDeleteData = path.match(/^\/api\/v2\/accounts\/(\d+)\/data$/);
+        if (method === "DELETE" && accountDeleteData) {
+          try {
+            const id = parseInt(accountDeleteData[1], 10);
+            const account = getAccount(id);
+            if (!account) {
+              return jsonError("NOT_FOUND", `Account ${id} not found`, 404);
+            }
+            const result = purgeAccountData(id);
+            return json({ id, transactionsDeleted: result.transactionsDeleted });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("PURGE_FAILED", msg, 500);
           }
         }
 
