@@ -32,6 +32,12 @@ export function usePurgeAccountData() {
       qc.invalidateQueries({ queryKey: queryKeys.accounts.balance() });
       qc.invalidateQueries({ queryKey: queryKeys.providers.list() });
       qc.invalidateQueries({ queryKey: queryKeys.transactions.all });
+      qc.invalidateQueries({ queryKey: queryKeys.categories.all });
+      qc.invalidateQueries({ queryKey: queryKeys.spending.all });
+      qc.invalidateQueries({ queryKey: queryKeys.income.all });
+      qc.invalidateQueries({ queryKey: queryKeys.reports.all });
+      qc.invalidateQueries({ queryKey: queryKeys.trends.all });
+      qc.invalidateQueries({ queryKey: queryKeys.insights.all });
     },
   });
 }

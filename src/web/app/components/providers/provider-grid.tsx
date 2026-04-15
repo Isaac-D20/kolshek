@@ -102,11 +102,13 @@ function PurgeConfirmDialog({
   open,
   onOpenChange,
   onConfirm,
+  isPending,
 }: {
   account: ProviderAccount | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
+  isPending?: boolean;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,8 +127,8 @@ function PurgeConfirmDialog({
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button variant="destructive" onClick={onConfirm}>
-            Delete Data
+          <Button variant="destructive" onClick={onConfirm} disabled={isPending}>
+            {isPending ? "Deleting..." : "Delete Data"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -195,9 +197,11 @@ function AccountRow({ account }: { account: ProviderAccount }) {
         account={account}
         open={showPurge}
         onOpenChange={setShowPurge}
+        isPending={purge.isPending}
         onConfirm={() => {
-          purge.mutate(account.id);
-          setShowPurge(false);
+          purge.mutate(account.id, {
+            onSuccess: () => setShowPurge(false),
+          });
         }}
       />
     </>

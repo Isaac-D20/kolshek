@@ -145,13 +145,20 @@ export function purgeAccountData(id: number): { purged: boolean; transactionsDel
     .get({ $id: id }) as { id: number } | null;
   if (!row) return { purged: false, transactionsDeleted: 0 };
 
-  const deleteResult = db
-    .prepare("DELETE FROM transactions WHERE account_id = $id")
-    .run({ $id: id });
-  db.prepare("UPDATE accounts SET balance = NULL, excluded = 1 WHERE id = $id").run({
-    $id: id,
-  });
-  return { purged: true, transactionsDeleted: deleteResult.changes };
+  db.run("BEGIN");
+  try {
+    const deleteResult = db
+      .prepare("DELETE FROM transactions WHERE account_id = $id")
+      .run({ $id: id });
+    db.prepare("UPDATE accounts SET balance = NULL, excluded = 1 WHERE id = $id").run({
+      $id: id,
+    });
+    db.run("COMMIT");
+    return { purged: true, transactionsDeleted: deleteResult.changes };
+  } catch (err) {
+    db.run("ROLLBACK");
+    throw err;
+  }
 }
 
 // Pre-create an account marked as excluded (used during provider setup).
