@@ -66,6 +66,7 @@ import {
   listCategories,
   updateCategoryClassification,
   getClassificationMap,
+  ensureCategoryWithClassification,
 } from "../db/repositories/categories.js";
 import {
   DEFAULT_SPENDING_EXCLUDES,
@@ -655,6 +656,8 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
 
             const updated = updateTransactionCategory(txId, category);
             if (!updated) return jsonError("NOT_FOUND", "Transaction not found.", 404);
+
+            if (category) ensureCategoryWithClassification(category);
 
             return json({ updated: true, id: txId, category });
           } catch (err) {
