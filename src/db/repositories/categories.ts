@@ -153,9 +153,10 @@ export function listAllCategories(): string[] {
   const db = getDatabase();
   const rows = db
     .prepare(
-      `SELECT name FROM categories
+      `SELECT name FROM categories WHERE name != ''
        UNION
-       SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL
+       SELECT DISTINCT category FROM transactions
+         WHERE category IS NOT NULL AND category != ''
        ORDER BY 1`,
     )
     .all() as Array<{ name: string }>;
@@ -377,14 +378,19 @@ export function listCategories(): CategorySummary[] {
   const db = getDatabase();
   const rows = db
     .prepare(
-      `SELECT
-         c.name AS category,
+      `WITH all_names AS (
+         SELECT name FROM categories WHERE name != ''
+         UNION
+         SELECT COALESCE(NULLIF(category, ''), 'Uncategorized') FROM transactions
+       )
+       SELECT
+         n.name AS category,
          COUNT(t.id) AS transaction_count,
          COALESCE(SUM(ABS(t.charged_amount)), 0) AS total_amount
-       FROM categories c
+       FROM all_names n
        LEFT JOIN transactions t
-         ON COALESCE(t.category, 'Uncategorized') = c.name
-       GROUP BY c.name
+         ON COALESCE(NULLIF(t.category, ''), 'Uncategorized') = n.name
+       GROUP BY n.name
        ORDER BY total_amount DESC`,
     )
     .all() as Array<{
