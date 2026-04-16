@@ -1,11 +1,6 @@
-## v0.4.7
-
-### Features
-
-- **Custom dashboard pages**: Create, list, and manage custom pages with composable widgets
-- **Account purge**: Delete all transaction data for a specific account
-- **Category rename & delete**: Rename or remove categories directly from the sidebar
+## v0.4.8
 
 ### Bug Fixes
 
-- **Hardened purge flow**: Wrapped in transaction, added cache invalidation, improved confirmation dialog
+- **Categories page no longer shows "No categories yet" when categorized transactions exist**: Orphan categories (used on transactions but never seeded in the categories table) are now surfaced in the list.
+- **Transaction edit no longer crashes with empty-category names**: Empty-string category names are filtered at the query level and treated as Uncategorized consistently.

@@ -4,7 +4,7 @@ description: Set up KolShek from scratch — connect bank accounts and credit ca
 compatibility: Requires KolShek CLI (kolshek) installed and configured.
 metadata:
   author: kolshek
-  version: "0.4.7"
+  version: "0.4.8"
 allowed-tools: Bash Read Write AskUserQuestion
 ---
 

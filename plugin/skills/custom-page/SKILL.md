@@ -9,7 +9,7 @@ description: >
 compatibility: Requires KolShek CLI (kolshek) installed and configured with at least one provider.
 metadata:
   author: kolshek
-  version: "0.4.7"
+  version: "0.4.8"
 allowed-tools: Bash Read Write AskUserQuestion
 ---
 
