@@ -5,6 +5,7 @@ import { existsSync, renameSync, unlinkSync, chmodSync } from "fs";
 import { createHash } from "crypto";
 import type { Command } from "commander";
 import chalk from "chalk";
+import { writeFile, spawnSync_compat } from "../file-utils.js";
 import {
   isJsonMode,
   printJson,
@@ -247,7 +248,7 @@ export function registerUpdateCommand(program: Command): void {
         renameSync(execPath, backupPath);
 
         // Write new binary
-        await Bun.write(execPath, buffer);
+        await writeFile(execPath, Buffer.from(buffer));
 
         // Set executable permission on Unix
         if (process.platform !== "win32") {
@@ -257,7 +258,7 @@ export function registerUpdateCommand(program: Command): void {
         // Remove macOS quarantine attribute so Gatekeeper doesn't block the binary
         if (process.platform === "darwin") {
           try {
-            Bun.spawnSync(["xattr", "-d", "com.apple.quarantine", execPath]);
+            spawnSync_compat(["xattr", "-d", "com.apple.quarantine", execPath]);
           } catch {
             // best-effort — xattr may not exist or attribute may not be set
           }

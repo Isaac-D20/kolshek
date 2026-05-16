@@ -74,17 +74,17 @@ function sanitizeError(err: unknown, secrets: string[]): Error {
 // OS keychain (Placeholder for Node port)
 // ---------------------------------------------------------------------------
 
-async function keychainStore(target: string, encoded: string): Promise<void> {
+async function keychainStore(_target: string, _encoded: string): Promise<void> {
   // OS keychain support requires native dependencies like 'keytar' or 'node-keytar'
   // For the initial Node port, we fall back to the encrypted file backend.
   throw new Error("OS keychain not supported in Node port. Using encrypted file fallback.");
 }
 
-async function keychainRead(target: string): Promise<string | null> {
+async function keychainRead(_target: string): Promise<string | null> {
   return null;
 }
 
-async function keychainDelete(target: string): Promise<boolean> {
+async function keychainDelete(_target: string): Promise<boolean> {
   return false;
 }
 
@@ -249,8 +249,8 @@ export function getCredentialSource(): "keychain" | "env" | "file" {
   return "file"; // Default to file in Node port
 }
 
-// Cached keychain support result — avoids repeated probe writes.
-let _keychainSupported: boolean | null = null;
+// Cached keychain support result — disabled in Node port since keychain support is disabled.
+// Not used in Node port since keychain support is disabled.
 
 // Test if the OS keychain is available on this platform.
 // Result is cached after the first successful probe.
@@ -261,7 +261,7 @@ export async function hasKeychainSupport(): Promise<boolean> {
 
 // Reset the cached keychain support result (for testing).
 export function resetKeychainCache(): void {
-  _keychainSupported = null;
+  //__keychainSupported = null;
 }
 
 // Store credentials for a provider.

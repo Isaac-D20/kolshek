@@ -3,6 +3,7 @@
 
 import { join } from "node:path";
 import { unlink } from "node:fs/promises";
+import { readFile, writeFile, fileExists } from "../cli/file-utils.js";
 import type { ScheduleConfig } from "../types/index.js";
 import { getAppPaths } from "./loader.js";
 import { run } from "../core/scheduler/index.js";
@@ -13,17 +14,17 @@ export function scheduleJsonPath(): string {
 }
 
 export async function readScheduleConfig(): Promise<ScheduleConfig | null> {
-  const file = Bun.file(scheduleJsonPath());
-  if (!(await file.exists())) return null;
+  if (!fileExists(scheduleJsonPath())) return null;
   try {
-    return (await file.json()) as ScheduleConfig;
+    const text = await readFile(scheduleJsonPath());
+    return JSON.parse(text) as ScheduleConfig;
   } catch {
     return null;
   }
 }
 
 export async function writeScheduleConfig(config: ScheduleConfig): Promise<void> {
-  await Bun.write(scheduleJsonPath(), JSON.stringify(config, null, 2));
+  await writeFile(scheduleJsonPath(), JSON.stringify(config, null, 2));
 }
 
 export async function deleteScheduleConfig(): Promise<void> {
@@ -58,6 +59,6 @@ export async function resolveBinaryPath(): Promise<string> {
     if (firstLine) return firstLine;
   } catch { /* not found */ }
 
-  // Fallback: bun run <script>
-  return `bun run "${scriptPath}"`;
+  // Fallback: npm run dev (for development)
+  return `npm run dev "${scriptPath}"`;
 }

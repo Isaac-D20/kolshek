@@ -5,6 +5,7 @@
  * macOS launchd, Linux systemd/cron).
  */
 
+import { spawn } from "child_process";
 import type { ScheduleConfig } from "../../types/index.js";
 
 /** Run a subprocess and return stdout. Throws on non-zero exit. */
@@ -12,27 +13,37 @@ export async function run(
   cmd: string[],
   stdin?: string,
 ): Promise<string> {
-  const proc = Bun.spawn(cmd, {
-    stdout: "pipe",
-    stderr: "pipe",
-    stdin: stdin !== undefined ? "pipe" : undefined,
+  return new Promise((resolve, reject) => {
+    const proc = spawn(cmd[0], cmd.slice(1), {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+
+    proc.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
+    proc.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+
+    if (stdin !== undefined) {
+      proc.stdin.write(stdin);
+      proc.stdin.end();
+    } else {
+      proc.stdin.end();
+    }
+
+    proc.on("exit", (exitCode) => {
+      const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
+      const stderr = Buffer.concat(stderrChunks).toString("utf-8");
+
+      if (exitCode !== 0) {
+        reject(new Error(`Command failed (exit ${exitCode}): ${stderr.trim() || stdout.trim()}`));
+      } else {
+        resolve(stdout);
+      }
+    });
+
+    proc.on("error", reject);
   });
-
-  if (stdin !== undefined && proc.stdin) {
-    proc.stdin.write(stdin);
-    proc.stdin.end();
-  }
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-
-  if (exitCode !== 0) {
-    throw new Error(`Command failed (exit ${exitCode}): ${stderr.trim() || stdout.trim()}`);
-  }
-  return stdout;
 }
 
 export interface SchedulerBackend {

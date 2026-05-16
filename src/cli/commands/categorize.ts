@@ -3,6 +3,7 @@
 import type { Command } from "commander";
 import { z } from "zod";
 import type { RuleConditions, CategoryRuleInput } from "../../types/index.js";
+import { readFile, fileExists, readStdin } from "../file-utils.js";
 import { BUILTIN_CLASSIFICATIONS, isValidClassification } from "../../types/index.js";
 import {
   createCategoryRule,
@@ -100,12 +101,10 @@ export function formatZodErrors(issues: z.ZodIssue[]): string {
 // ---------------------------------------------------------------------------
 
 async function readJsonFile(filePath: string): Promise<unknown> {
-  const file = Bun.file(filePath);
-  const exists = await file.exists();
-  if (!exists) {
+  if (!fileExists(filePath)) {
     throw new Error(`File not found: ${filePath}`);
   }
-  const text = await file.text();
+  const text = await readFile(filePath);
   try {
     return JSON.parse(text);
   } catch {
@@ -372,12 +371,11 @@ Examples:
       let rawJson: string;
 
       if (filePath) {
-        const file = Bun.file(filePath);
-        if (!(await file.exists())) {
+        if (!fileExists(filePath)) {
           printError("NOT_FOUND", `File not found: ${filePath}`);
           process.exit(ExitCode.BadArgs);
         }
-        rawJson = await file.text();
+        rawJson = await readFile(filePath);
       } else {
         if (process.stdin.isTTY) {
           printError(
@@ -388,7 +386,7 @@ Examples:
           );
           process.exit(ExitCode.BadArgs);
         }
-        rawJson = await new Response(Bun.stdin.stream()).text();
+        rawJson = await readStdin();
       }
 
       let parsed: unknown;

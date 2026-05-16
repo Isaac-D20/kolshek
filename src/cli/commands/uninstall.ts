@@ -3,6 +3,7 @@
 import { existsSync, unlinkSync, renameSync, readFileSync, writeFileSync, readdirSync, rmdirSync } from "fs";
 import { join } from "path";
 import type { Command } from "commander";
+import { spawnSync_compat } from "../file-utils.js";
 import {
   isJsonMode,
   printJson,
@@ -28,9 +29,9 @@ function getBinaryName(): string {
 
 // Remove kolshek from user PATH on Windows via registry
 function removeFromWindowsPath(installDir: string): boolean {
-  const result = Bun.spawnSync(["reg", "query", "HKCU\\Environment", "/v", "Path"]);
+  const result = spawnSync_compat(["reg", "query", "HKCU\\Environment", "/v", "Path"]);
   const output = result.stdout.toString();
-  if (result.exitCode !== 0) return false;
+  if (result.status !== 0) return false;
 
   // Parse the current PATH value
   const match = output.match(/REG_(?:EXPAND_)?SZ\s+(.*)/);
@@ -48,11 +49,11 @@ function removeFromWindowsPath(installDir: string): boolean {
   const typeMatch = output.match(/(REG_(?:EXPAND_)?SZ)/);
   const regType = typeMatch ? typeMatch[1] : "REG_EXPAND_SZ";
 
-  const setResult = Bun.spawnSync(["reg", "add", "HKCU\\Environment", "/v", "Path", "/t", regType, "/d", newPath, "/f"]);
-  if (setResult.exitCode !== 0) return false;
+  const setResult = spawnSync_compat(["reg", "add", "HKCU\\Environment", "/v", "Path", "/t", regType, "/d", newPath, "/f"]);
+  if (setResult.status !== 0) return false;
 
   // Broadcast WM_SETTINGCHANGE so new terminals pick up the change
-  Bun.spawnSync(["powershell", "-NoProfile", "-Command",
+  spawnSync_compat(["powershell", "-NoProfile", "-Command",
     "[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User'), 'User')"]);
 
   return true;
@@ -108,9 +109,9 @@ function removeRecursive(dir: string): boolean {
   if (!existsSync(dir)) return false;
   try {
     if (process.platform === "win32") {
-      Bun.spawnSync(["cmd", "/c", "rmdir", "/s", "/q", dir]);
+      spawnSync_compat(["cmd", "/c", "rmdir", "/s", "/q", dir]);
     } else {
-      Bun.spawnSync(["rm", "-rf", dir]);
+      spawnSync_compat(["rm", "-rf", dir]);
     }
     return !existsSync(dir);
   } catch {

@@ -52,8 +52,8 @@ export function closeDatabase(): void {
   }
 }
 
-// Migrations embedded as strings so they survive bun build --compile
-// (the compiled binary cannot read .sql files from disk).
+// Migrations embedded as strings to ensure they are always available
+// (this pattern also works well for compiled binaries).
 const MIGRATIONS: [string, string][] = [
   ["001_initial.sql", `-- KolShek initial schema
 -- Providers: banks and credit card companies

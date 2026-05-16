@@ -5,10 +5,14 @@
 // Run after: bun run build:web
 // Run before: bun build --compile
 
-import { readdirSync, readFileSync, statSync } from "fs";
+import {
+  readdirSync, readFileSync, statSync, writeFileSync,
+} from "fs";
 import { join, relative, extname } from "path";
+import { fileURLToPath } from "url";
 
-const ROOT = join(import.meta.dir, "..");
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const ROOT = join(__dirname, "..");
 const SPA_DIR = join(ROOT, "src", "web", "dist", "app");
 const ASSETS_DIR = join(ROOT, "assets");
 const OUT_FILE = join(ROOT, "src", "web", "web-files.ts");
@@ -106,7 +110,7 @@ for (const [path, file] of files) {
 lines.push("};");
 lines.push("");
 
-await Bun.write(OUT_FILE, lines.join("\n"));
+writeFileSync(OUT_FILE, lines.join("\n"));
 
 const textCount = [...files.values()].filter((f) => !f.binary).length;
 const binaryCount = [...files.values()].filter((f) => f.binary).length;

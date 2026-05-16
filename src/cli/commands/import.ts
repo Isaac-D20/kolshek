@@ -4,6 +4,7 @@ import type { Command } from "commander";
 import { resolve } from "path";
 import { existsSync } from "fs";
 import { confirm } from "@inquirer/prompts";
+import { readFile } from "../file-utils.js";
 import {
   validateCsvImport,
   buildTransactionInput,
@@ -51,7 +52,7 @@ export function registerImportCommand(program: Command): void {
       }
 
       // Read and validate CSV
-      const text = await Bun.file(filePath).text();
+      const text = await readFile(filePath);
       const validation = validateCsvImport(text);
 
       if (validation.errors.length > 0 && !opts.skipErrors) {

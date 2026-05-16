@@ -41,7 +41,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-query": "^5.90.21",
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^12.10.0",
     "chalk": "^5.4.0",
     "class-variance-authority": "^0.7.1",
     "cli-table3": "^0.6.0",

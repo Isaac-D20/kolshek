@@ -1,9 +1,9 @@
 /**
- * Compatibility shim: maps bun:sqlite Database API to better-sqlite3
- * so that vitest (running under Node) can execute database code.
+ * Compatibility shim: wraps better-sqlite3 Database API to support $-prefixed parameter binding.
+ * This enables code written for Bun's sqlite API to work under Node.js with better-sqlite3.
  *
- * Key difference: bun:sqlite uses $-prefixed keys in param objects (e.g. { $name: "x" })
- * while better-sqlite3 expects unprefixed keys (e.g. { name: "x" }).
+ * Key feature: converts $-prefixed keys in param objects (e.g. { $name: "x" })
+ * to unprefixed keys expected by better-sqlite3 (e.g. { name: "x" }).
  */
 import BetterSqlite3 from "better-sqlite3";
 
