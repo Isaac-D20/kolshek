@@ -108,7 +108,7 @@ interface JsonError {
   metadata: JsonMetadata;
 }
 
-import pkg from "../../package.json";
+import pkg from "../../package.json" with { type: 'json' };
 
 function meta(): JsonMetadata {
   const m: JsonMetadata = { timestamp: new Date().toISOString(), version: pkg.version };

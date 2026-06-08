@@ -16,7 +16,7 @@ import {
   createSpinner,
   ExitCode,
 } from "../output.js";
-import pkg from "../../../package.json";
+import pkg from "../../../package.json" with { type: 'json' };
 
 const REPO = "DaveDushi/kolshek";
 const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`;

@@ -55,7 +55,7 @@ export function createCategory(name: string, classification: Classification = "e
   const db = getDatabase();
   const result = db
     .prepare("INSERT OR IGNORE INTO categories (name, classification) VALUES ($name, $classification)")
-    .run({ $name: name, $classification: classification });
+    .run({ name: name, classification: classification });
   return result.changes > 0;
 }
 
@@ -64,14 +64,14 @@ export function updateCategoryClassification(name: string, classification: Class
   db.prepare(
     `INSERT INTO categories (name, classification) VALUES ($name, $classification)
      ON CONFLICT(name) DO UPDATE SET classification = $classification`,
-  ).run({ $name: name, $classification: classification });
+  ).run({ name: name, classification: classification });
 }
 
 export function getCategoryClassification(name: string): string | null {
   const db = getDatabase();
   const row = db
     .prepare("SELECT classification FROM categories WHERE name = $name")
-    .get({ $name: name }) as { classification: string } | null;
+    .get({ name: name }) as { classification: string } | null;
   return row?.classification ?? null;
 }
 
@@ -94,7 +94,7 @@ export function buildClassificationExcludeSQL(
   }
   const placeholders = classifications.map((_, i) => `$excl_${i}`);
   const params: Record<string, string> = {};
-  classifications.forEach((c, i) => { params[`$excl_${i}`] = c; });
+  classifications.forEach((c, i) => { params[`excl_${i}`] = c; });
   const sql = `COALESCE(${tableAlias}.category, '') NOT IN (
     SELECT name FROM categories WHERE classification IN (${placeholders.join(", ")})
   )`;
@@ -111,7 +111,7 @@ export function buildClassificationIncludeSQL(
   }
   const placeholders = classifications.map((_, i) => `$incl_${i}`);
   const params: Record<string, string> = {};
-  classifications.forEach((c, i) => { params[`$incl_${i}`] = c; });
+  classifications.forEach((c, i) => { params[`incl_${i}`] = c; });
   const sql = `COALESCE(${tableAlias}.category, 'Uncategorized') IN (
     SELECT name FROM categories WHERE classification IN (${placeholders.join(", ")})
   )`;
@@ -126,14 +126,14 @@ export function ensureCategoryWithClassification(
   const db = getDatabase();
   db.prepare(
     "INSERT OR IGNORE INTO categories (name, classification) VALUES ($name, $classification)",
-  ).run({ $name: name, $classification: defaultClassification });
+  ).run({ name: name, classification: defaultClassification });
 }
 
 export function categoryExists(name: string): boolean {
   const db = getDatabase();
   const row = db
     .prepare("SELECT 1 FROM categories WHERE name = $name")
-    .get({ $name: name });
+    .get({ name: name });
   return !!row;
 }
 
@@ -143,9 +143,9 @@ export function deleteCategory(
 ): { transactionsUpdated: number; rulesUpdated: number } {
   const result = renameCategory(name, moveTo);
   const db = getDatabase();
-  db.prepare("DELETE FROM categories WHERE name = $name").run({ $name: name });
+  db.prepare("DELETE FROM categories WHERE name = $name").run({ name: name });
   // Ensure destination exists
-  db.prepare("INSERT OR IGNORE INTO categories (name) VALUES ($name)").run({ $name: moveTo });
+  db.prepare("INSERT OR IGNORE INTO categories (name) VALUES ($name)").run({ name: moveTo });
   return result;
 }
 
@@ -178,11 +178,11 @@ export function createCategoryRule(
     .prepare(
       "INSERT INTO category_rules (category, conditions, priority) VALUES ($category, $conditions, $priority)",
     )
-    .run({ $category: category, $conditions: conditionsJson, $priority: priority });
+    .run({ category: category, conditions: conditionsJson, priority: priority });
 
   const row = db
     .prepare("SELECT * FROM category_rules WHERE id = $id")
-    .get({ $id: result.lastInsertRowid }) as CategoryRuleRow;
+    .get({ id: result.lastInsertRowid }) as CategoryRuleRow;
 
   return rowToRule(row);
 }
@@ -203,7 +203,7 @@ export function findRuleByConditions(conditions: RuleConditions): CategoryRule |
   const conditionsJson = serializeConditions(conditions);
   const row = db
     .prepare("SELECT * FROM category_rules WHERE conditions = $conditions")
-    .get({ $conditions: conditionsJson }) as CategoryRuleRow | null;
+    .get({ conditions: conditionsJson }) as CategoryRuleRow | null;
 
   return row ? rowToRule(row) : null;
 }
@@ -212,7 +212,7 @@ export function deleteCategoryRule(id: number): boolean {
   const db = getDatabase();
   const result = db
     .prepare("DELETE FROM category_rules WHERE id = $id")
-    .run({ $id: id });
+    .run({ id: id });
 
   return result.changes > 0;
 }
@@ -265,7 +265,7 @@ export function applyCategoryRules(options?: ApplyRulesOptions): ApplyRulesResul
     categoryFilter = "";
   } else if (scope === "from-category") {
     categoryFilter = "AND t.category = $fromCategory";
-    params.$fromCategory = fromCategory!;
+    params.fromCategory = fromCategory!;
   } else {
     categoryFilter = "AND (t.category IS NULL OR t.category = 'Uncategorized')";
   }
@@ -306,15 +306,15 @@ export function applyCategoryRules(options?: ApplyRulesOptions): ApplyRulesResul
       const updateStmt = db.prepare(
         "UPDATE transactions SET category = $category, updated_at = datetime('now') WHERE id = $id",
       );
-      db.run("BEGIN");
+      db.exec("BEGIN");
       try {
         for (const [txId, category] of assignments) {
-          updateStmt.run({ $id: txId, $category: category });
+          updateStmt.run({ id: txId, category: category });
           applied++;
         }
-        db.run("COMMIT");
+        db.exec("COMMIT");
       } catch (err) {
-        db.run("ROLLBACK");
+        db.exec("ROLLBACK");
         throw err;
       }
     }
@@ -417,35 +417,35 @@ export interface RenameResult {
 
 export function renameCategory(oldName: string, newName: string): RenameResult {
   const db = getDatabase();
-  db.run("BEGIN");
+  db.exec("BEGIN");
   try {
     const txResult = db
       .prepare(
         "UPDATE transactions SET category = $new, updated_at = datetime('now') WHERE category = $old",
       )
-      .run({ $old: oldName, $new: newName });
+      .run({ old: oldName, new: newName });
 
     const ruleResult = db
       .prepare("UPDATE category_rules SET category = $new WHERE category = $old")
-      .run({ $old: oldName, $new: newName });
+      .run({ old: oldName, new: newName });
 
     // Update categories table: ensure new exists (inheriting old classification), remove old
     const oldRow = db
       .prepare("SELECT classification FROM categories WHERE name = $name")
-      .get({ $name: oldName }) as { classification: string } | null;
+      .get({ name: oldName }) as { classification: string } | null;
     const oldClassification = oldRow?.classification ?? "expense";
     db.prepare(
       "INSERT OR IGNORE INTO categories (name, classification) VALUES ($name, $classification)",
-    ).run({ $name: newName, $classification: oldClassification });
-    db.prepare("DELETE FROM categories WHERE name = $name").run({ $name: oldName });
+    ).run({ name: newName, classification: oldClassification });
+    db.prepare("DELETE FROM categories WHERE name = $name").run({ name: oldName });
 
-    db.run("COMMIT");
+    db.exec("COMMIT");
     return {
       transactionsUpdated: txResult.changes,
       rulesUpdated: ruleResult.changes,
     };
   } catch (err) {
-    db.run("ROLLBACK");
+    db.exec("ROLLBACK");
     throw err;
   }
 }
@@ -459,11 +459,11 @@ export function renameCategoryDryRun(
 
   const txRow = db
     .prepare("SELECT COUNT(*) AS count FROM transactions WHERE category = $old")
-    .get({ $old: oldName }) as { count: number };
+    .get({ old: oldName }) as { count: number };
 
   const ruleRow = db
     .prepare("SELECT COUNT(*) AS count FROM category_rules WHERE category = $old")
-    .get({ $old: oldName }) as { count: number };
+    .get({ old: oldName }) as { count: number };
 
   return {
     transactionsAffected: txRow.count,
@@ -497,17 +497,17 @@ export function bulkMigrateCategories(
   let totalTx = 0;
   let totalRules = 0;
 
-  db.run("BEGIN");
+  db.exec("BEGIN");
   try {
     for (const [oldName, newName] of entries) {
-      const txResult = txStmt.run({ $old: oldName, $new: newName });
-      const ruleResult = ruleStmt.run({ $old: oldName, $new: newName });
+      const txResult = txStmt.run({ old: oldName, new: newName });
+      const ruleResult = ruleStmt.run({ old: oldName, new: newName });
       totalTx += txResult.changes;
       totalRules += ruleResult.changes;
     }
-    db.run("COMMIT");
+    db.exec("COMMIT");
   } catch (err) {
-    db.run("ROLLBACK");
+    db.exec("ROLLBACK");
     throw err;
   }
 
@@ -540,8 +540,8 @@ export function bulkMigrateCategoriesDryRun(
   const results: BulkMigrateDryRunEntry[] = [];
 
   for (const [oldName, newName] of Object.entries(mapping)) {
-    const txRow = txStmt.get({ $old: oldName }) as { count: number };
-    const ruleRow = ruleStmt.get({ $old: oldName }) as { count: number };
+    const txRow = txStmt.get({ old: oldName }) as { count: number };
+    const ruleRow = ruleStmt.get({ old: oldName }) as { count: number };
     results.push({
       oldName,
       newName,
@@ -575,9 +575,9 @@ export function bulkImportCategoryRules(
   for (const rule of rules) {
     const conditionsJson = serializeConditions(rule.conditions);
     const result = insertStmt.run({
-      $category: rule.category,
-      $conditions: conditionsJson,
-      $priority: rule.priority ?? 0,
+      category: rule.category,
+      conditions: conditionsJson,
+      priority: rule.priority ?? 0,
     });
     if (result.changes > 0) {
       imported++;
@@ -679,7 +679,7 @@ export function reassignCategory(
        SET category = $toCategory, updated_at = datetime('now')
        WHERE (description LIKE $pattern ESCAPE '\\' OR description_en LIKE $pattern ESCAPE '\\')`,
     )
-    .run({ $toCategory: toCategory, $pattern: pattern });
+    .run({ toCategory: toCategory, pattern: pattern });
 
   return { updated: result.changes };
 }
@@ -695,7 +695,7 @@ export function reassignCategoryDryRun(
       `SELECT COUNT(*) AS count FROM transactions
        WHERE (description LIKE $pattern ESCAPE '\\' OR description_en LIKE $pattern ESCAPE '\\')`,
     )
-    .get({ $pattern: pattern }) as { count: number };
+    .get({ pattern: pattern }) as { count: number };
 
   return { affected: row.count };
 }
@@ -717,16 +717,16 @@ export function bulkReassignCategories(
 
   let totalUpdated = 0;
 
-  db.run("BEGIN");
+  db.exec("BEGIN");
   try {
     for (const entry of entries) {
       const pattern = `%${escapeLike(entry.matchPattern)}%`;
-      const result = stmt.run({ $toCategory: entry.toCategory, $pattern: pattern });
+      const result = stmt.run({ toCategory: entry.toCategory, pattern: pattern });
       totalUpdated += result.changes;
     }
-    db.run("COMMIT");
+    db.exec("COMMIT");
   } catch (err) {
-    db.run("ROLLBACK");
+    db.exec("ROLLBACK");
     throw err;
   }
 
@@ -750,7 +750,7 @@ export function bulkReassignCategoriesDryRun(
 
   return entries.map((entry) => {
     const pattern = `%${escapeLike(entry.matchPattern)}%`;
-    const row = stmt.get({ $pattern: pattern }) as { count: number };
+    const row = stmt.get({ pattern: pattern }) as { count: number };
     return {
       matchPattern: entry.matchPattern,
       toCategory: entry.toCategory,

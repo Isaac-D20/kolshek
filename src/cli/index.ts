@@ -36,7 +36,7 @@ import { registerImportCommand } from "./commands/import.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
 import { syncProviders } from "../services/sync.js";
-import pkg from "../../package.json";
+import pkg from "../../package.json" with { type: 'json' };
 import { getSplashBanner } from "./splash.js";
 
 const program = new Command();

@@ -46,8 +46,8 @@ export function upsertAccount(
        LIMIT 1`,
     )
     .get({
-      $companyId: companyId,
-      $accountNumber: accountNumber,
+      companyId: companyId,
+      accountNumber: accountNumber,
     }) as AccountRow | null;
 
   if (existing) {
@@ -58,9 +58,9 @@ export function upsertAccount(
          currency = COALESCE($currency, currency)
        WHERE id = $id`,
     ).run({
-      $balance: balance ?? null,
-      $currency: currency ?? null,
-      $id: existing.id,
+      balance: balance ?? null,
+      currency: currency ?? null,
+      id: existing.id,
     });
     if (balance !== undefined) existing.balance = balance;
     if (currency !== undefined) existing.currency = currency;
@@ -78,10 +78,10 @@ export function upsertAccount(
        RETURNING *`,
     )
     .get({
-      $providerId: providerId,
-      $accountNumber: accountNumber,
-      $balance: balance ?? null,
-      $currency: currency ?? "ILS",
+      providerId: providerId,
+      accountNumber: accountNumber,
+      balance: balance ?? null,
+      currency: currency ?? "ILS",
     }) as AccountRow;
 
   return rowToAccount(row);
@@ -93,7 +93,7 @@ export function getAccountsByProvider(providerId: number): Account[] {
     .prepare(
       "SELECT * FROM accounts WHERE provider_id = $providerId ORDER BY account_number",
     )
-    .all({ $providerId: providerId }) as AccountRow[];
+    .all({ providerId: providerId }) as AccountRow[];
 
   return rows.map(rowToAccount);
 }
@@ -102,7 +102,7 @@ export function getAccount(id: number): Account | null {
   const db = getDatabase();
   const row = db
     .prepare("SELECT * FROM accounts WHERE id = $id")
-    .get({ $id: id }) as AccountRow | null;
+    .get({ id: id }) as AccountRow | null;
 
   return row ? rowToAccount(row) : null;
 }
@@ -110,8 +110,8 @@ export function getAccount(id: number): Account | null {
 export function updateAccountExcluded(id: number, excluded: boolean): void {
   const db = getDatabase();
   db.prepare("UPDATE accounts SET excluded = $excluded WHERE id = $id").run({
-    $excluded: excluded ? 1 : 0,
-    $id: id,
+    excluded: excluded ? 1 : 0,
+    id: id,
   });
 }
 
@@ -131,8 +131,8 @@ export function isAccountExcludedByKey(
        LIMIT 1`,
     )
     .get({
-      $companyId: companyId,
-      $accountNumber: accountNumber,
+      companyId: companyId,
+      accountNumber: accountNumber,
     }) as { excluded: number } | null;
 
   return row?.excluded === 1;
@@ -142,21 +142,21 @@ export function purgeAccountData(id: number): { purged: boolean; transactionsDel
   const db = getDatabase();
   const row = db
     .prepare("SELECT id FROM accounts WHERE id = $id")
-    .get({ $id: id }) as { id: number } | null;
+    .get({ id: id }) as { id: number } | null;
   if (!row) return { purged: false, transactionsDeleted: 0 };
 
-  db.run("BEGIN");
+  db.exec("BEGIN");
   try {
     const deleteResult = db
       .prepare("DELETE FROM transactions WHERE account_id = $id")
-      .run({ $id: id });
+      .run({ id: id });
     db.prepare("UPDATE accounts SET balance = NULL, excluded = 1 WHERE id = $id").run({
-      $id: id,
+      id: id,
     });
-    db.run("COMMIT");
+    db.exec("COMMIT");
     return { purged: true, transactionsDeleted: deleteResult.changes };
   } catch (err) {
-    db.run("ROLLBACK");
+    db.exec("ROLLBACK");
     throw err;
   }
 }
@@ -172,7 +172,7 @@ export function createExcludedAccount(
      VALUES ($providerId, $accountNumber, 1)
      ON CONFLICT (provider_id, account_number) DO UPDATE SET excluded = 1`,
   ).run({
-    $providerId: providerId,
-    $accountNumber: accountNumber,
+    providerId: providerId,
+    accountNumber: accountNumber,
   });
 }

@@ -223,7 +223,7 @@ export function registerImportCommand(program: Command): void {
 
       // Execute import in a DB transaction
       const db = getDatabase();
-      db.run("BEGIN");
+      db.exec("BEGIN");
       try {
         for (const { input } of inputs) {
           const result = upsertTransaction(input);
@@ -231,9 +231,9 @@ export function registerImportCommand(program: Command): void {
           else if (result.action === "updated") updateCount++;
           else dupCount++;
         }
-        db.run("COMMIT");
+        db.exec("COMMIT");
       } catch (err) {
-        db.run("ROLLBACK");
+        db.exec("ROLLBACK");
         printError("IMPORT_ERROR", `Import failed: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(ExitCode.Error);
       }

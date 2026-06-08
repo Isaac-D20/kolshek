@@ -36,7 +36,7 @@ export function getCategoryByMonth(opts: InsightOpts): CategoryByMonth[] {
     GROUP BY month, category
     ORDER BY month, total DESC
   `;
-  return db.prepare(sql).all({ $from: opts.from, ...excludeParams }) as CategoryByMonth[];
+  return db.prepare(sql).all({ from: opts.from, ...excludeParams }) as CategoryByMonth[];
 }
 
 export interface LargeTransactionRow {
@@ -56,7 +56,7 @@ export function getLargeTransactions(opts: InsightOpts): { transactions: LargeTr
     SELECT ROUND(AVG(ABS(t.charged_amount)), 2) AS avg_amount
     FROM transactions t WHERE t.charged_amount < 0 AND t.date >= $from
       AND ${excludeSQL}
-  `).get({ $from: opts.currentMonthStart, ...excludeParams }) as { avg_amount: number } | null;
+  `).get({ from: opts.currentMonthStart, ...excludeParams }) as { avg_amount: number } | null;
 
   const avgAmount = avgRow?.avg_amount ?? 0;
 
@@ -66,7 +66,7 @@ export function getLargeTransactions(opts: InsightOpts): { transactions: LargeTr
     FROM transactions t WHERE t.charged_amount < 0 AND t.date >= $from
       AND ${excludeSQL}
     ORDER BY amount DESC LIMIT 20
-  `).all({ $from: opts.currentMonthStart, ...excludeParams }) as LargeTransactionRow[];
+  `).all({ from: opts.currentMonthStart, ...excludeParams }) as LargeTransactionRow[];
 
   return { transactions: rows, avgAmount };
 }
@@ -110,8 +110,8 @@ export function getMerchantHistory(opts: InsightOpts): MerchantHistoryRow[] {
     ORDER BY current_amount DESC
   `;
   const rows = db.prepare(sql).all({
-    $from: opts.from,
-    $currentMonth: opts.currentMonthStart,
+    from: opts.from,
+    currentMonth: opts.currentMonthStart,
     ...excludeParams,
   }) as Array<{
     merchant: string;
@@ -153,5 +153,5 @@ export function getMonthCashflow(opts: InsightOpts): MonthCashflowRow[] {
     WHERE t.date >= $from AND ${excludeSQL}
     GROUP BY month ORDER BY month DESC
   `;
-  return db.prepare(sql).all({ $from: opts.from, ...excludeParams }) as MonthCashflowRow[];
+  return db.prepare(sql).all({ from: opts.from, ...excludeParams }) as MonthCashflowRow[];
 }

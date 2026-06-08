@@ -76,7 +76,7 @@ export function upsertTransaction(
     .prepare(
       "SELECT id, status, hash FROM transactions WHERE account_id = $accountId AND hash = $hash",
     )
-    .get({ $accountId: input.accountId, $hash: input.hash }) as
+    .get({ accountId: input.accountId, hash: input.hash }) as
     | { id: number; status: string; hash: string }
     | null;
 
@@ -89,7 +89,7 @@ export function upsertTransaction(
         `SELECT id, status, hash FROM transactions
          WHERE account_id = $accountId AND unique_id = $uniqueId AND status = 'pending'`,
       )
-      .get({ $accountId: input.accountId, $uniqueId: input.uniqueId }) as
+      .get({ accountId: input.accountId, uniqueId: input.uniqueId }) as
       | { id: number; status: string; hash: string }
       | null
     ?? db
@@ -103,10 +103,10 @@ export function upsertTransaction(
          LIMIT 1`,
       )
       .get({
-        $accountId: input.accountId,
-        $description: input.description,
-        $chargedAmount: input.chargedAmount,
-        $date: input.date,
+        accountId: input.accountId,
+        description: input.description,
+        chargedAmount: input.chargedAmount,
+        date: input.date,
       }) as
       | { id: number; status: string; hash: string }
       | null;
@@ -130,19 +130,19 @@ export function upsertTransaction(
              updated_at = datetime('now')
          WHERE id = $id`,
       ).run({
-        $id: pendingMatch.id,
-        $date: input.date,
-        $processedDate: input.processedDate,
-        $status: input.status,
-        $chargedAmount: input.chargedAmount,
-        $chargedCurrency: input.chargedCurrency ?? null,
-        $originalAmount: input.originalAmount,
-        $originalCurrency: input.originalCurrency,
-        $description: input.description,
-        $memo: input.memo ?? null,
-        $identifier: input.identifier ?? null,
-        $hash: input.hash,
-        $uniqueId: input.uniqueId,
+        id: pendingMatch.id,
+        date: input.date,
+        processedDate: input.processedDate,
+        status: input.status,
+        chargedAmount: input.chargedAmount,
+        chargedCurrency: input.chargedCurrency ?? null,
+        originalAmount: input.originalAmount,
+        originalCurrency: input.originalCurrency,
+        description: input.description,
+        memo: input.memo ?? null,
+        identifier: input.identifier ?? null,
+        hash: input.hash,
+        uniqueId: input.uniqueId,
       });
       return { action: "updated" };
     }
@@ -160,24 +160,24 @@ export function upsertTransaction(
         $category, $hash, $uniqueId
       )`,
     ).run({
-      $accountId: input.accountId,
-      $type: input.type,
-      $identifier: input.identifier ?? null,
-      $date: input.date,
-      $processedDate: input.processedDate,
-      $originalAmount: input.originalAmount,
-      $originalCurrency: input.originalCurrency,
-      $chargedAmount: input.chargedAmount,
-      $chargedCurrency: input.chargedCurrency ?? null,
-      $description: input.description,
-      $descriptionEn: input.descriptionEn ?? null,
-      $memo: input.memo ?? null,
-      $status: input.status,
-      $installmentNumber: input.installmentNumber ?? null,
-      $installmentTotal: input.installmentTotal ?? null,
-      $category: input.category ?? null,
-      $hash: input.hash,
-      $uniqueId: input.uniqueId,
+      accountId: input.accountId,
+      type: input.type,
+      identifier: input.identifier ?? null,
+      date: input.date,
+      processedDate: input.processedDate,
+      originalAmount: input.originalAmount,
+      originalCurrency: input.originalCurrency,
+      chargedAmount: input.chargedAmount,
+      chargedCurrency: input.chargedCurrency ?? null,
+      description: input.description,
+      descriptionEn: input.descriptionEn ?? null,
+      memo: input.memo ?? null,
+      status: input.status,
+      installmentNumber: input.installmentNumber ?? null,
+      installmentTotal: input.installmentTotal ?? null,
+      category: input.category ?? null,
+      hash: input.hash,
+      uniqueId: input.uniqueId,
     });
     return { action: "inserted" };
   }
@@ -195,13 +195,13 @@ export function upsertTransaction(
            updated_at = datetime('now')
        WHERE id = $id`,
     ).run({
-      $id: existing.id,
-      $status: input.status,
-      $processedDate: input.processedDate,
-      $chargedAmount: input.chargedAmount,
-      $chargedCurrency: input.chargedCurrency ?? null,
-      $originalAmount: input.originalAmount,
-      $originalCurrency: input.originalCurrency,
+      id: existing.id,
+      status: input.status,
+      processedDate: input.processedDate,
+      chargedAmount: input.chargedAmount,
+      chargedCurrency: input.chargedCurrency ?? null,
+      originalAmount: input.originalAmount,
+      originalCurrency: input.originalCurrency,
     });
     return { action: "updated" };
   }
@@ -247,55 +247,55 @@ function buildFilterClauses(filters: TransactionFilters): {
 
   if (filters.from) {
     conditions.push("t.date >= $from");
-    params.$from = filters.from;
+    params.from = filters.from;
   }
   if (filters.to) {
     conditions.push("t.date <= $to");
     // Append end-of-day so date-only filters include the full day
-    params.$to = filters.to.length === 10 ? filters.to + "T23:59:59.999Z" : filters.to;
+    params.to = filters.to.length === 10 ? filters.to + "T23:59:59.999Z" : filters.to;
   }
   if (filters.providerId !== undefined) {
     conditions.push("a.provider_id = $providerId");
-    params.$providerId = filters.providerId;
+    params.providerId = filters.providerId;
   }
   if (filters.providerCompanyId) {
     conditions.push("p.company_id = $providerCompanyId");
-    params.$providerCompanyId = filters.providerCompanyId;
+    params.providerCompanyId = filters.providerCompanyId;
   }
   if (filters.providerType) {
     conditions.push("p.type = $providerType");
-    params.$providerType = filters.providerType;
+    params.providerType = filters.providerType;
   }
   if (filters.accountId !== undefined) {
     conditions.push("t.account_id = $accountId");
-    params.$accountId = filters.accountId;
+    params.accountId = filters.accountId;
   }
   if (filters.accountNumber) {
     conditions.push("a.account_number = $accountNumber");
-    params.$accountNumber = filters.accountNumber;
+    params.accountNumber = filters.accountNumber;
   }
   if (filters.minAmount !== undefined) {
     conditions.push("t.charged_amount >= $minAmount");
-    params.$minAmount = filters.minAmount;
+    params.minAmount = filters.minAmount;
   }
   if (filters.maxAmount !== undefined) {
     conditions.push("t.charged_amount <= $maxAmount");
-    params.$maxAmount = filters.maxAmount;
+    params.maxAmount = filters.maxAmount;
   }
   if (filters.status) {
     conditions.push("t.status = $status");
-    params.$status = filters.status;
+    params.status = filters.status;
   }
   if (filters.description) {
     conditions.push("t.description LIKE $description ESCAPE '\\'");
-    params.$description = `%${escapeLike(filters.description)}%`;
+    params.description = `%${escapeLike(filters.description)}%`;
   }
   if (filters.category !== undefined) {
     if (filters.category === null || filters.category === "Uncategorized") {
       conditions.push("(t.category IS NULL OR t.category = 'Uncategorized')");
     } else {
       conditions.push("t.category = $category");
-      params.$category = filters.category;
+      params.category = filters.category;
     }
   }
   if (filters.translated === true) {
@@ -324,10 +324,10 @@ export function listTransactions(
   let limitClause = "";
   if (filters.limit !== undefined) {
     limitClause = "LIMIT $limit";
-    params.$limit = filters.limit;
+    params.limit = filters.limit;
     if (filters.offset !== undefined) {
       limitClause += " OFFSET $offset";
-      params.$offset = filters.offset;
+      params.offset = filters.offset;
     }
   }
 
@@ -349,7 +349,7 @@ export function searchTransactions(
   const { conditions, params } = buildFilterClauses(filters ?? {});
 
   conditions.push("t.description LIKE $searchQuery ESCAPE '\\'");
-  params.$searchQuery = `%${escapeLike(query)}%`;
+  params.searchQuery = `%${escapeLike(query)}%`;
 
   const whereClause = "WHERE " + conditions.join(" AND ");
 
@@ -361,10 +361,10 @@ export function searchTransactions(
   let limitClause = "";
   if (filters?.limit !== undefined) {
     limitClause = "LIMIT $limit";
-    params.$limit = filters.limit;
+    params.limit = filters.limit;
     if (filters.offset !== undefined) {
       limitClause += " OFFSET $offset";
-      params.$offset = filters.offset;
+      params.offset = filters.offset;
     }
   }
 
@@ -381,13 +381,13 @@ export function deleteTransaction(
 
   const existing = db
     .prepare("SELECT description, charged_amount, date FROM transactions WHERE id = $id")
-    .get({ $id: id }) as { description: string; charged_amount: number; date: string } | null;
+    .get({ id: id }) as { description: string; charged_amount: number; date: string } | null;
 
   if (!existing) {
     return { deleted: false };
   }
 
-  db.prepare("DELETE FROM transactions WHERE id = $id").run({ $id: id });
+  db.prepare("DELETE FROM transactions WHERE id = $id").run({ id: id });
 
   return {
     deleted: true,
@@ -408,7 +408,7 @@ export function updateTransactionCategory(
     .prepare(
       "UPDATE transactions SET category = $category, updated_at = datetime('now') WHERE id = $id",
     )
-    .run({ $id: id, $category: category });
+    .run({ id: id, category: category });
   return result.changes > 0;
 }
 
@@ -421,7 +421,7 @@ export function updateTransactionTranslation(
     .prepare(
       "UPDATE transactions SET description_en = $descriptionEn, updated_at = datetime('now') WHERE id = $id",
     )
-    .run({ $id: id, $descriptionEn: descriptionEn });
+    .run({ id: id, descriptionEn: descriptionEn });
   return result.changes > 0;
 }
 

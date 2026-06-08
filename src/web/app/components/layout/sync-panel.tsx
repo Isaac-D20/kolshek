@@ -44,12 +44,21 @@ interface ProviderStatus {
 
 // Map known stage names to approximate progress percentages
 const STAGE_PROGRESS: Record<string, number> = {
+  "loading_credentials": 5,
+  "scraping": 10,
+  "login_start": 20,
   "logging in": 20,
-  "waiting for OTP": 30,
-  "entering OTP": 40,
+  "before_otp": 30,
+  "waiting for otp": 30,
+  "entering otp": 40,
+  "after_otp": 45,
+  "extract_start": 50,
   "fetching accounts": 50,
   "fetching transactions": 70,
+  "extract_end": 85,
+  "processing": 90,
   "saving": 90,
+  "terminating": 95,
   "done": 100,
 };
 
@@ -168,7 +177,7 @@ function ProviderRow({ provider }: { provider: ProviderStatus }) {
                 : "text-muted-foreground"
             )}
           >
-            {provider.stage || "starting..."}
+            {provider.stage.replace(/_/g, " ") || "starting..."}
           </span>
         </div>
       </div>

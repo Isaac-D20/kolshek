@@ -63,11 +63,13 @@ type ProviderType = "bank" | "credit-card";
 interface AddProviderWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSync?: (options?: { providerId?: number; visible?: boolean }) => void;
 }
 
 export function AddProviderWizard({
   open,
   onOpenChange,
+  onSync,
 }: AddProviderWizardProps) {
   const [step, setStep] = useState(1);
   const [selectedType, setSelectedType] = useState<ProviderType | null>(null);
@@ -155,8 +157,11 @@ export function AddProviderWizard({
         credentials,
       },
       {
-        onSuccess: () => {
+        onSuccess: (res) => {
           handleOpenChange(false);
+          if (onSync && res.id) {
+            onSync({ providerId: res.id });
+          }
         },
       }
     );

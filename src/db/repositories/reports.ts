@@ -21,15 +21,15 @@ function buildDateConditions(
 
   if (range.from) {
     conditions.push("t.date >= $from");
-    params.$from = range.from;
+    params.from = range.from;
   }
   if (range.to) {
     conditions.push("t.date <= $to");
-    params.$to = range.to.length === 10 ? range.to + "T23:59:59.999Z" : range.to;
+    params.to = range.to.length === 10 ? range.to + "T23:59:59.999Z" : range.to;
   }
   if (providerType) {
     conditions.push("p.type = $providerType");
-    params.$providerType = providerType;
+    params.providerType = providerType;
   }
 
   return { conditions, params };
@@ -184,7 +184,7 @@ export function getMerchantReport(
   conditions.push("t.charged_amount < 0");
   conditions.push(excludeSQL);
 
-  params.$limit = limit;
+  params.limit = limit;
 
   const sql = `
     SELECT
@@ -241,13 +241,13 @@ export function getBalanceReport(
   const excl = excludeClassifications ?? DEFAULT_REPORT_EXCLUDES;
   const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(excl, "t2");
 
-  // Build a separate exclude clause for the t3 subquery with remapped params
-  const { sql: rawSQL3, params: rawParams3 } = buildClassificationExcludeSQL(excl, "t3");
-  const excludeSQL3 = rawSQL3.replace(/\$excl_/g, "$excl3_");
-  const excludeParams3: Record<string, string> = {};
-  for (const [k, v] of Object.entries(rawParams3)) {
-    excludeParams3[k.replace("$excl_", "$excl3_")] = v;
-  }
+   // Build a separate exclude clause for the t3 subquery with remapped params
+   const { sql: rawSQL3, params: rawParams3 } = buildClassificationExcludeSQL(excl, "t3");
+   const excludeSQL3 = rawSQL3.replace(/\$excl_/g, "$excl3_");
+   const excludeParams3: Record<string, string> = {};
+   for (const [k, v] of Object.entries(rawParams3)) {
+     excludeParams3[k.replace("excl_", "excl3_")] = v;
+   }
 
   const sql = `
     SELECT

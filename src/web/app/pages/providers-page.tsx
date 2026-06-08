@@ -169,7 +169,7 @@ export default function ProvidersPage() {
       />
 
       {/* Add provider wizard */}
-      <AddProviderWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+      <AddProviderWizard open={wizardOpen} onOpenChange={setWizardOpen} onSync={handleSync} />
 
       {/* Sync progress panel */}
       <SyncPanel

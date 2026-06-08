@@ -34,11 +34,11 @@ export function createTranslationRule(englishName: string, pattern: string): Tra
     .prepare(
       "INSERT INTO translation_rules (english_name, match_pattern) VALUES ($englishName, $pattern)",
     )
-    .run({ $englishName: englishName, $pattern: pattern });
+    .run({ englishName: englishName, pattern: pattern });
 
   const row = db
     .prepare("SELECT * FROM translation_rules WHERE id = $id")
-    .get({ $id: result.lastInsertRowid }) as TranslationRuleRow;
+    .get({ id: result.lastInsertRowid }) as TranslationRuleRow;
 
   return rowToRule(row);
 }
@@ -56,7 +56,7 @@ export function deleteTranslationRule(id: number): boolean {
   const db = getDatabase();
   const result = db
     .prepare("DELETE FROM translation_rules WHERE id = $id")
-    .run({ $id: id });
+    .run({ id: id });
 
   return result.changes > 0;
 }
@@ -69,7 +69,7 @@ export function applyTranslationRules(): { applied: number } {
 
   let applied = 0;
 
-  db.run("BEGIN");
+  db.exec("BEGIN");
   try {
     for (const rule of rules) {
       const pattern = `%${escapeLike(rule.match_pattern)}%`;
@@ -80,13 +80,13 @@ export function applyTranslationRules(): { applied: number } {
            WHERE description LIKE $pattern ESCAPE '\\'
              AND description_en IS NULL`,
         )
-        .run({ $englishName: rule.english_name, $pattern: pattern });
+        .run({ englishName: rule.english_name, pattern: pattern });
 
       applied += result.changes;
     }
-    db.run("COMMIT");
+    db.exec("COMMIT");
   } catch (err) {
-    db.run("ROLLBACK");
+    db.exec("ROLLBACK");
     throw err;
   }
 
@@ -119,10 +119,10 @@ export function listUntranslatedGrouped(
   const params: Record<string, string | number> = {};
   if (options?.limit) {
     sql += ` LIMIT $limit`;
-    params.$limit = options.limit;
+    params.limit = options.limit;
     if (options.offset) {
       sql += ` OFFSET $offset`;
-      params.$offset = options.offset;
+      params.offset = options.offset;
     }
   }
 
@@ -153,7 +153,7 @@ export function translateByDescription(
       `UPDATE transactions SET description_en = $en, updated_at = datetime('now')
        WHERE description = $desc AND description_en IS NULL`,
     )
-    .run({ $en: englishName, $desc: hebrewDesc });
+    .run({ en: englishName, desc: hebrewDesc });
   return result.changes;
 }
 
@@ -175,7 +175,7 @@ export function listTranslatedGrouped(
   if (options?.search) {
     const pattern = `%${escapeLike(options.search)}%`;
     whereClauses.push(`(description LIKE $search ESCAPE '\\' OR description_en LIKE $search ESCAPE '\\')`);
-    params.$search = pattern;
+    params.search = pattern;
   }
 
   const where = whereClauses.join(" AND ");
@@ -196,10 +196,10 @@ export function listTranslatedGrouped(
 
   if (options?.limit) {
     sql += ` LIMIT $limit`;
-    params.$limit = options.limit;
+    params.limit = options.limit;
     if (options.offset) {
       sql += ` OFFSET $offset`;
-      params.$offset = options.offset;
+      params.offset = options.offset;
     }
   }
 
@@ -232,7 +232,7 @@ export function updateTranslationByDescription(
       `UPDATE transactions SET description_en = $en, updated_at = datetime('now')
        WHERE description = $desc`,
     )
-    .run({ $en: englishName, $desc: hebrewDesc });
+    .run({ en: englishName, desc: hebrewDesc });
   return result.changes;
 }
 
@@ -258,8 +258,8 @@ export function bulkImportTranslationRules(
 
   for (const rule of rules) {
     const result = insertStmt.run({
-      $englishName: rule.englishName,
-      $pattern: rule.matchPattern,
+      englishName: rule.englishName,
+      pattern: rule.matchPattern,
     });
     if (result.changes > 0) {
       imported++;

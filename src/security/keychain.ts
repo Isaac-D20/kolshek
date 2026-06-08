@@ -30,8 +30,8 @@ function validateAlias(alias: string): void {
   if (typeof alias !== "string" || alias.length === 0 || alias.length > 64) {
     throw new Error("Invalid credential alias: must be 1-64 characters");
   }
-  if (!/^[a-zA-Z0-9_-]+$/.test(alias)) {
-    throw new Error("Invalid credential alias: only alphanumeric, dash, underscore allowed");
+  if (!/^[ a-zA-Z0-9_-]+$/.test(alias)) {
+    throw new Error("Invalid credential alias: only alphanumeric, dash, underscore, and space allowed");
   }
   if (alias === "__proto__" || alias === "constructor" || alias === "prototype") {
     throw new Error(`Reserved alias: ${alias}`);
@@ -246,7 +246,7 @@ export function getCredentialSource(): "keychain" | "env" | "file" {
   // Check if encrypted credentials file exists (fallback)
   if (existsSync(credentialsEncPath())) return "file";
 
-  return "file"; // Default to file in Node port
+  return "keychain"; // Default to keychain in Node port
 }
 
 // Cached keychain support result — disabled in Node port since keychain support is disabled.

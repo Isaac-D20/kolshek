@@ -42,8 +42,8 @@ export interface IncomeOpts {
 export function getIncomeReport(opts: IncomeOpts): IncomeResult {
   const db = getDatabase();
   const params: Record<string, string | number> = {
-    $from: opts.from,
-    $to: opts.to,
+    from: opts.from,
+    to: opts.to,
   };
 
   const excludeClassifications = opts.excludeClassifications ?? DEFAULT_INCOME_EXCLUDES;

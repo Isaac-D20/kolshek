@@ -38,8 +38,8 @@ export interface SpendingOpts {
 export function getSpendingReport(opts: SpendingOpts): SpendingResult {
   const db = getDatabase();
   const params: Record<string, string | number> = {
-    $from: opts.from,
-    $to: opts.to,
+    from: opts.from,
+    to: opts.to,
   };
 
   const excludeClassifications = opts.excludeClassifications ?? DEFAULT_SPENDING_EXCLUDES;
@@ -55,11 +55,11 @@ export function getSpendingReport(opts: SpendingOpts): SpendingResult {
 
   if (opts.category) {
     conditions.push("COALESCE(t.category, 'Uncategorized') = $category");
-    params.$category = opts.category;
+    params.category = opts.category;
   }
   if (opts.providerType) {
     conditions.push("p.type = $providerType");
-    params.$providerType = opts.providerType;
+    params.providerType = opts.providerType;
   }
 
   let labelExpr: string;

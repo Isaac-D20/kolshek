@@ -89,10 +89,10 @@ initDatabase(getDbPath());
 
 if (clearFirst) {
   const db = getDatabase();
-  db.run("DELETE FROM transactions");
-  db.run("DELETE FROM accounts");
-  db.run("DELETE FROM sync_log");
-  db.run("DELETE FROM providers");
+  db.exec("DELETE FROM transactions");
+  db.exec("DELETE FROM accounts");
+  db.exec("DELETE FROM sync_log");
+  db.exec("DELETE FROM providers");
   console.log("Cleared existing data.");
 }
 

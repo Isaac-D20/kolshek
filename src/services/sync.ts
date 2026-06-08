@@ -52,6 +52,7 @@ export interface SyncOptions {
   config?: AppConfig;
   chromePath?: string;
   onProgress?: (companyId: string, stage: string) => void;
+  onResult?: (result: ProviderSyncResult) => void;
   concurrency?: number;
   fromDate?: Date;
   toDate?: Date;
@@ -149,8 +150,11 @@ export async function syncProviders(
     const results = await runWithConcurrency(
       targets,
       concurrency,
-      (provider) =>
-        syncSingleProvider(provider, config, chromePath, browser, options),
+      async (provider) => {
+        const result = await syncSingleProvider(provider, config, chromePath, browser, options);
+        options?.onResult?.(result);
+        return result;
+      },
       options?.signal,
     );
 
@@ -299,7 +303,7 @@ async function syncSingleProvider(
     let totalAdded = 0;
     let totalUpdated = 0;
 
-    db.run("BEGIN");
+    db.exec("BEGIN");
     try {
       for (const acct of scrapeResult.accounts) {
         // Skip accounts the user has excluded from syncing
@@ -361,9 +365,9 @@ async function syncSingleProvider(
       // Complete sync log
       completeSyncLog(syncLog.id, "success", totalAdded, totalUpdated);
 
-      db.run("COMMIT");
+      db.exec("COMMIT");
     } catch (err) {
-      db.run("ROLLBACK");
+      db.exec("ROLLBACK");
       throw err;
     }
 
