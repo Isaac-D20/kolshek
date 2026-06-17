@@ -35,6 +35,10 @@ import {
   hasCredentials,
 } from "../../security/keychain.js";
 import { computeAuthStatus } from "../../core/auth-status.js";
+import {
+  startTwoFactorAuth,
+  exchangeOtpToken,
+} from "../../core/two-factor-auth.js";
 import { scrapeProvider, findChromePath, launchBrowser, closeBrowser } from "../../core/scraper.js";
 import {
   isJsonMode,
@@ -59,6 +63,30 @@ import {
 function zeroCredentials(creds: Record<string, string>): void {
   for (const key of Object.keys(creds)) {
     creds[key] = "";
+  }
+}
+
+async function resolveTwoFactorCredentialsIfNeeded(
+  companyId: CompanyId,
+  credentials: Record<string, string>,
+): Promise<Record<string, string>> {
+  if (companyId !== "oneZero") {
+    return credentials;
+  };
+
+  await startTwoFactorAuth(companyId, credentials.phoneNumber);
+  try {
+    const otpCode = await input({
+      message: "otp code:",
+    });
+    const result = await exchangeOtpToken(credentials.phoneNumber, otpCode);
+    return {
+      email: credentials.email ?? "",
+      password: credentials.password ?? "",
+      otpLongTermToken: result,
+    };
+  } catch (err) {
+    throw new Error(`Two-factor authentication failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -186,7 +214,7 @@ export function registerProvidersCommand(program: Command): void {
       }
 
       // Enter credentials
-      const credentials: Record<string, string> = {};
+      let credentials: Record<string, string> = {};
       for (const field of providerInfo.loginFields) {
         if (field === "password") {
           credentials[field] = await password({
@@ -196,6 +224,16 @@ export function registerProvidersCommand(program: Command): void {
         } else {
           credentials[field] = await input({ message: `${field}:` });
         }
+      }
+
+      try {
+        credentials = await resolveTwoFactorCredentialsIfNeeded(companyId, credentials);
+      } catch (err) {
+        printError(
+          "OTP_FAILED",
+          sanitizeError(err instanceof Error ? err.message : String(err), credentials),
+        );
+        process.exit(ExitCode.AuthFailure);
       }
 
       // Test connection
@@ -365,7 +403,7 @@ export function registerProvidersCommand(program: Command): void {
 
       info(`${providerInfo.displayName} requires: ${providerInfo.loginFields.join(", ")}\n`);
 
-      const credentials: Record<string, string> = {};
+      let credentials: Record<string, string> = {};
       for (const field of providerInfo.loginFields) {
         if (field === "password") {
           credentials[field] = await password({
@@ -380,6 +418,16 @@ export function registerProvidersCommand(program: Command): void {
         } else {
           credentials[field] = await input({ message: `${field}:` });
         }
+      }
+
+      try {
+        credentials = await resolveTwoFactorCredentialsIfNeeded(provider.companyId as CompanyId, credentials);
+      } catch (err) {
+        printError(
+          "OTP_FAILED",
+          sanitizeError(err instanceof Error ? err.message : String(err), credentials),
+        );
+        process.exit(ExitCode.AuthFailure);
       }
 
       // Optional connection test

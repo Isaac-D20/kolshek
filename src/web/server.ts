@@ -3,9 +3,21 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { randomBytes } from "node:crypto";
+import { setTimeout } from 'node:timers/promises';
 import { WEB_FILES } from "./web-files.js";
+import { computeAuthStatus } from "../core/auth-status.js";
 import {
-  listProviders, createProvider, deleteProvider, getProvider, getMostRecentSyncTime,
+  startTwoFactorAuth,
+  exchangeOtpToken,
+  parseTwoFactorAuthInput,
+} from "../core/two-factor-auth.js";
+import {
+  listProviders,
+  createProvider,
+  deleteProvider,
+  getProvider,
+  getMostRecentSyncTime,
+  getProviderByAlias,
 } from "../db/repositories/providers.js";
 import {
   listCategoryRules, applyCategoryRules, createCategoryRule, deleteCategoryRule,
@@ -40,7 +52,12 @@ import {
   getFixedVariableTrendData,
 } from "../services/trends.js";
 import { getInsights } from "../services/insights.js";
-import { listRecentSyncLogs, countSyncLogsSince, getLatestCompletedSyncLog } from "../db/repositories/sync-log.js";
+import {
+    hasSuccessfulSync,
+    listRecentSyncLogs,
+    countSyncLogsSince,
+    getLatestCompletedSyncLog
+} from "../db/repositories/sync-log.js";
 import { parseMonthToRange } from "../shared/date-utils.js";
 
 
@@ -156,14 +173,9 @@ export function startDashboard(port: number) {
       }
     };
 
-    const heartbeat = setInterval(() => {
-      res.write(": heartbeat\n\n");
-    }, 15000);
-
     const controller = new AbortController();
 
-    req.on("close", () => {
-      clearInterval(heartbeat);
+    res.on("close", () => {
       if (currentSyncAbort === controller) {
         controller.abort();
         currentSyncAbort = null;
@@ -191,7 +203,7 @@ export function startDashboard(port: number) {
       });
 
       // Re-introduce a small delay after sending the start event
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await setTimeout(100);
       const syncResult = await fetchAndApplyRules(targetProviders, {
         visible: !!visible,
         signal: controller.signal,
@@ -234,7 +246,6 @@ export function startDashboard(port: number) {
         sendEvent({ type: "error", error: err.message || "Unknown error" });
       }
     } finally {
-      clearInterval(heartbeat);
       if (currentSyncAbort === controller) {
         currentSyncAbort = null;
       }
@@ -276,14 +287,9 @@ export function startDashboard(port: number) {
       }
     };
 
-    const heartbeat = setInterval(() => {
-      res.write(": heartbeat\n\n");
-    }, 15000);
-
     const controller = new AbortController();
 
-    req.on("close", () => {
-      clearInterval(heartbeat);
+    res.on("close", () => {
       if (currentSyncAbort === controller) {
         controller.abort();
         currentSyncAbort = null;
@@ -319,7 +325,7 @@ export function startDashboard(port: number) {
       });
 
       // Re-introduce a small delay after sending the start event
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await setTimeout(100);
       const syncResult = await fetchAndApplyRules(targetProviders, {
         visible: !!visible,
         signal: controller.signal,
@@ -362,7 +368,6 @@ export function startDashboard(port: number) {
         sendEvent({ type: "error", error: err.message || "Unknown error" });
       }
     } finally {
-      clearInterval(heartbeat);
       if (currentSyncAbort === controller) {
         currentSyncAbort = null;
       }
@@ -432,20 +437,15 @@ export function startDashboard(port: number) {
   app.get("/api/v2/providers", async (_req, res) => {
     const providers = listProviders();
     const data = await Promise.all(providers.map(async p => {
-      const accounts = getAccountsByProvider(p.id);
-      const lastSync = getLatestCompletedSyncLog(p.id);
-
-      let authStatus = "no";
       const hasCreds = await hasCredentials(p.alias);
-      if (hasCreds) {
-        if (!lastSync) {
-          authStatus = "pending";
-        } else if (lastSync.status === "success") {
-          authStatus = "connected";
-        } else {
-          authStatus = "expired";
-        }
-      }
+      const accounts = getAccountsByProvider(p.id);
+      const latestSync = getLatestCompletedSyncLog(p.id);
+      const everSucceeded = hasSuccessfulSync(p.id);
+      const authStatus = computeAuthStatus(
+        hasCreds,
+        (latestSync?.status as "success" | "error") ?? null,
+        everSucceeded,
+      );
 
       return {
         ...p,
@@ -460,23 +460,72 @@ export function startDashboard(port: number) {
   });
 
   app.post("/api/v2/providers", async (req, res) => {
-    const { companyId, alias, displayName, credentials } = req.body;
-    const type = PROVIDERS[companyId as keyof typeof PROVIDERS]?.type || "bank";
-    const provider = createProvider(companyId, displayName || companyId, type, alias);
-    if (credentials) {
-      await storeCredentials(provider.alias, credentials);
-    }
-    res.json({
-      success: true,
-      data: {
-        ...provider,
-        hasCredentials: !!credentials,
-        authStatus: !!credentials ? "pending" : "no",
-        accounts: [],
-        accountCount: 0,
-        transactionCount: 0
+    try {
+      const { companyId, alias, displayName, credentials } = req.body;
+      const type = PROVIDERS[companyId as keyof typeof PROVIDERS]?.type || "bank";
+      const effectiveAlias = parseStringBody(alias) || parseStringBody(displayName) || companyId;
+
+      if (getProviderByAlias(effectiveAlias)) {
+        return res.status(409).json({
+          success: false,
+          error: {
+            code: "ALIAS_EXISTS",
+            message: `A provider with alias "${effectiveAlias}" already exists`,
+          },
+        });
       }
-    });
+
+      const provider = createProvider(companyId, displayName || companyId, type, effectiveAlias);
+      let requiresOtp = false;
+      let hasCredentials = false;
+      let authStatus = "no";
+      // TODO: update 2FA handling
+      if (credentials) {
+        if (provider.companyId === "oneZero" && parseTwoFactorAuthInput(credentials) && !credentials.otpLongTermToken) {
+          try {
+            const otpResult = await startTwoFactorAuth(provider.companyId, credentials.phoneNumber);
+            if (otpResult.success) {
+              requiresOtp = true;
+              authStatus = "pending";
+            }
+          } catch (err) {
+            deleteProvider(provider.id);
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "OTP_TRIGGER_FAILED",
+                message: err instanceof Error ? err.message : "Failed to start OTP authentication",
+              },
+            });
+          }
+        } else {
+          await storeCredentials(provider.alias, credentials);
+          hasCredentials = true;
+          authStatus = "pending";
+        }
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          ...provider,
+          hasCredentials,
+          authStatus,
+          accounts: [],
+          accountCount: 0,
+          transactionCount: 0,
+          requiresOtp,
+        },
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: "PROVIDER_CREATE_FAILED",
+          message: err instanceof Error ? err.message : "Failed to create provider",
+        },
+      });
+    }
   });
 
   app.delete("/api/v2/providers/:id", async (req, res) => {
@@ -490,14 +539,124 @@ export function startDashboard(port: number) {
   });
 
   app.post("/api/v2/providers/:id/auth", async (req, res) => {
-    const id = parseInt(req.params.id);
-    const { credentials } = req.body;
-    const provider = getProvider(id);
-    if (provider && credentials) {
+    try {
+      const id = parseInt(req.params.id);
+      const { credentials, otpCode } = req.body;
+      const provider = getProvider(id);
+      if (!provider) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "Provider not found",
+          },
+        });
+      }
+
+      const otp = parseStringBody(otpCode);
+      if (otp) {
+        try {
+          if (!credentials || !credentials.phoneNumber) {
+            throw new Error("Missing phone number for OTP exchange");
+          }
+          const otpLongTermToken = await exchangeOtpToken(credentials.phoneNumber, otp);
+          await storeCredentials(provider.alias, {
+              email: credentials.email,
+              password: credentials.password,
+              otpLongTermToken: otpLongTermToken,
+            });
+          return res.json({
+            success: true,
+            data: {
+              ...provider,
+              hasCredentials: true,
+              authStatus: "pending",
+              accounts: [],
+              accountCount: 0,
+              transactionCount: 0,
+              requiresOtp: false,
+            },
+          });
+        } catch (err) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "OTP_COMPLETE_FAILED",
+              message: err instanceof Error ? err.message : "Failed to complete OTP authentication",
+            },
+          });
+        }
+      }
+
+      if (!credentials) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "MISSING_CREDENTIALS",
+            message: "Missing credentials",
+          },
+        });
+      }
+
+      if (provider.companyId === "oneZero" && !credentials.phoneNumber) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "INVALID_CREDENTIALS",
+            message: "One Zero credentials require email, password, and phoneNumber",
+          },
+        });
+      }
+
+      if (provider.companyId === "oneZero" && parseTwoFactorAuthInput(credentials) && !credentials.otpLongTermToken) {
+        try {
+          const otpResult = await startTwoFactorAuth(provider.companyId, credentials.phoneNumber);
+          if (otpResult.success)
+            return res.json({
+                success: true,
+                data: {
+                  ...provider,
+                  hasCredentials: false,
+                  authStatus: "pending",
+                  accounts: [],
+                  accountCount: 0,
+                  transactionCount: 0,
+                  requiresOtp: true,
+                },
+          });
+        } catch (err) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "OTP_TRIGGER_FAILED",
+              message: err instanceof Error ? err.message : "Failed to start OTP authentication",
+            },
+          });
+        }
+      }
+
       await storeCredentials(provider.alias, credentials);
-      return res.json({ success: true });
+      return res.json({
+        success: true,
+        data: {
+          ...provider,
+          hasCredentials: true,
+          authStatus: "pending",
+          accounts: [],
+          accountCount: 0,
+          transactionCount: 0,
+          requiresOtp: false,
+        },
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: "PROVIDER_AUTH_FAILED",
+          message: err instanceof Error ? err.message : "Failed to update provider credentials",
+        },
+      });
     }
-    res.status(404).json({ success: false, error: "Provider not found" });
   });
 
   app.get("/api/v2/providers/fields/:companyId", (req, res) => {
@@ -519,7 +678,7 @@ export function startDashboard(port: number) {
     res.json({ success: true });
   });
 
-  app.get("/api/v2/pages/events", (req, res) => {
+  app.get("/api/v2/pages/events", (_req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -530,7 +689,7 @@ export function startDashboard(port: number) {
       res.write("data: ping\n\n");
     }, 30000);
 
-    req.on("close", () => clearInterval(timer));
+    res.on("close", () => clearInterval(timer));
   });
 
   // Categories
@@ -838,6 +997,21 @@ export function startDashboard(port: number) {
 
   app.get("/api/v2/reports/balance", (_req, res) => {
     res.json({ success: true, data: getBalanceReport() });
+  });
+
+  // Generic error handling for API routes
+  app.use("/api/", (err: any, _req: any, res: any, next: any) => {
+    if (err) {
+      console.error("[API Error]", err);
+      return res.status(err.status || 500).json({
+        success: false,
+        error: {
+          code: err.code || "SERVER_ERROR",
+          message: err.message || "An unexpected server error occurred.",
+        },
+      });
+    }
+    next();
   });
 
   // SPA Fallback

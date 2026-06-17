@@ -31,7 +31,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
-import { useProviderFields, useCreateProvider } from "@/hooks/use-providers";
+import { useProviderFields, useCreateProvider, useUpdateAuth } from "@/hooks/use-providers";
 import { cn } from "@/lib/utils";
 
 // Well-known Israeli financial providers
@@ -76,8 +76,12 @@ export function AddProviderWizard({
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [alias, setAlias] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [pendingProviderId, setPendingProviderId] = useState<number | null>(null);
+  const [awaitingOtp, setAwaitingOtp] = useState(false);
 
   const createProvider = useCreateProvider();
+  const updateAuth = useUpdateAuth();
 
   // Fetch login fields for the selected provider
   const { data: fieldsData, isLoading: fieldsLoading } =
@@ -104,12 +108,16 @@ export function AddProviderWizard({
           setSelectedCompanyId("");
           setCredentials({});
           setAlias("");
+          setOtpCode("");
+          setPendingProviderId(null);
+          setAwaitingOtp(false);
           createProvider.reset();
+          updateAuth.reset();
         }, 200);
       }
       onOpenChange(isOpen);
     },
-    [onOpenChange, createProvider]
+    [onOpenChange, createProvider, updateAuth]
   );
 
   // Navigation
@@ -126,10 +134,12 @@ export function AddProviderWizard({
         );
       case 4:
         return true;
+      case 5:
+        return otpCode.trim() !== "";
       default:
         return false;
     }
-  }, [step, selectedType, selectedCompanyId, loginFields, credentials]);
+  }, [step, selectedType, selectedCompanyId, loginFields, credentials, otpCode]);
 
   const handleNext = useCallback(() => {
     if (step < 4) {
@@ -158,6 +168,15 @@ export function AddProviderWizard({
       },
       {
         onSuccess: (res) => {
+          if (res.requiresOtp) {
+            setPendingProviderId(res.id);
+            setAwaitingOtp(true);
+            setOtpCode("");
+            updateAuth.reset();
+            setStep(5);
+            return;
+          }
+
           handleOpenChange(false);
           if (onSync && res.id) {
             onSync({ providerId: res.id });
@@ -171,7 +190,25 @@ export function AddProviderWizard({
     credentials,
     createProvider,
     handleOpenChange,
+    updateAuth,
   ]);
+
+  const handleOtpSubmit = useCallback(() => {
+    if (!pendingProviderId || !otpCode.trim()) return;
+
+    updateAuth.mutate(
+      { id: pendingProviderId, otpCode: otpCode.trim(), credentials: credentials },
+      {
+        onSuccess: () => {
+          const providerId = pendingProviderId;
+          handleOpenChange(false);
+          if (onSync && providerId) {
+            onSync({ providerId });
+          }
+        },
+      }
+    );
+  }, [pendingProviderId, otpCode, updateAuth, handleOpenChange, onSync, credentials]); // Add credentials to dependencies
 
   // Update a single credential field
   const setCredentialField = useCallback(
@@ -193,6 +230,7 @@ export function AddProviderWizard({
       card5Digits: "Last 5 Digits",
       card6Digits: "Last 6 Digits",
       otpCodeReturnRecipient: "OTP Code Return Recipient",
+      phoneNumber: "Phone Number",
     };
     return labels[field] || field.charAt(0).toUpperCase() + field.slice(1);
   }, []);
@@ -213,12 +251,13 @@ export function AddProviderWizard({
             {step === 2 && "Select your bank or credit card provider."}
             {step === 3 && "Enter your login credentials."}
             {step === 4 && "Set an optional alias for this connection."}
+            {step === 5 && "Enter the OTP code sent to your phone."}
           </DialogDescription>
         </DialogHeader>
 
         {/* Step indicators */}
         <div className="flex items-center justify-center gap-2 py-2">
-          {[1, 2, 3, 4].map((s) => (
+          {Array.from({ length: awaitingOtp ? 5 : 4 }, (_, index) => index + 1).map((s) => (
             <div
               key={s}
               className={cn(
@@ -364,14 +403,47 @@ export function AddProviderWizard({
               )}
             </div>
           )}
+
+          {/* Step 5: OTP */}
+          {step === 5 && (
+            <div className="space-y-4">
+              <Alert className="flex items-start gap-2 border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
+                <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <p className="text-xs">
+                  Enter the OTP code sent to the phone number you provided for One Zero.
+                </p>
+              </Alert>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="provider-otp">OTP Code</Label>
+                <Input
+                  id="provider-otp"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                />
+              </div>
+
+              {updateAuth.isError && (
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
+                  <p className="text-sm text-destructive">
+                    {updateAuth.error instanceof Error
+                      ? updateAuth.error.message
+                      : "Failed to verify OTP"}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          {step > 1 && (
+          {step > 1 && step < 5 && (
             <Button
               variant="outline"
               onClick={handleBack}
-              disabled={createProvider.isPending}
+              disabled={createProvider.isPending || updateAuth.isPending}
             >
               <ChevronLeft className="h-4 w-4" />
               Back
@@ -381,6 +453,20 @@ export function AddProviderWizard({
             <Button onClick={handleNext} disabled={!canNext}>
               Next
               <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : step === 5 ? (
+            <Button
+              onClick={handleOtpSubmit}
+              disabled={!canNext || updateAuth.isPending}
+            >
+              {updateAuth.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                "Verify OTP"
+              )}
             </Button>
           ) : (
             <Button

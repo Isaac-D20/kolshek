@@ -52,10 +52,12 @@ export function useUpdateAuth() {
     mutationFn: ({
       id,
       credentials,
+      otpCode,
     }: {
       id: number;
-      credentials: Record<string, string>;
-    }) => api.post(`/api/v2/providers/${id}/auth`, { credentials }),
+      credentials?: Record<string, string>;
+      otpCode?: string;
+    }) => api.post(`/api/v2/providers/${id}/auth`, { credentials, otpCode }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.providers.all });
     },

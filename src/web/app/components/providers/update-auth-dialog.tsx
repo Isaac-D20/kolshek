@@ -44,7 +44,10 @@ export function UpdateAuthDialog({
   onOpenChange,
 }: UpdateAuthDialogProps) {
   const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [otpCode, setOtpCode] = useState("");
+  const [awaitingOtp, setAwaitingOtp] = useState(false);
   const updateAuth = useUpdateAuth();
+  const isTwoFactor = provider?.companyId === "oneZero";
 
   const { data: fieldsData, isLoading: fieldsLoading } = useProviderFields(
     provider?.companyId ?? ""
@@ -54,6 +57,7 @@ export function UpdateAuthDialog({
   const allFilled = loginFields.every(
     (f) => credentials[f] && credentials[f].trim() !== ""
   );
+  const otpFilled = otpCode.trim() !== "";
 
   const resetMutation = updateAuth.reset;
   const handleOpenChange = useCallback(
@@ -61,6 +65,8 @@ export function UpdateAuthDialog({
       if (!isOpen) {
         setTimeout(() => {
           setCredentials({});
+          setOtpCode("");
+          setAwaitingOtp(false);
           resetMutation();
         }, 200);
       }
@@ -70,12 +76,43 @@ export function UpdateAuthDialog({
   );
 
   const handleSubmit = useCallback(() => {
-    if (!provider || !allFilled) return;
+    if (!provider) return;
+
+    if (awaitingOtp) {
+      if (!otpFilled) return;
+      updateAuth.mutate(
+        { id: provider.id, otpCode: otpCode.trim(), credentials: credentials },
+        { onSuccess: () => handleOpenChange(false) }
+      );
+      return;
+    }
+
+    if (!allFilled) return;
     updateAuth.mutate(
       { id: provider.id, credentials },
-      { onSuccess: () => handleOpenChange(false) }
+      {
+        onSuccess: (res: any) => {
+          if (isTwoFactor && res?.requiresOtp) {
+            setAwaitingOtp(true);
+            setOtpCode("");
+            updateAuth.reset();
+            return;
+          }
+          handleOpenChange(false);
+        },
+      }
     );
-  }, [provider, allFilled, credentials, updateAuth, handleOpenChange]);
+  }, [
+    provider,
+    allFilled,
+    otpFilled,
+    awaitingOtp,
+    otpCode,
+    credentials,
+    isTwoFactor,
+    updateAuth,
+    handleOpenChange,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -83,8 +120,17 @@ export function UpdateAuthDialog({
         <DialogHeader>
           <DialogTitle>Update Credentials</DialogTitle>
           <DialogDescription>
-            Enter new login credentials for{" "}
-            <span className="font-medium">{provider?.displayName}</span>.
+            {awaitingOtp ? (
+              <>
+                Enter the OTP code sent to{" "}
+                <span className="font-medium">{provider?.displayName}</span>.
+              </>
+            ) : (
+              <>
+                Enter new login credentials for{" "}
+                <span className="font-medium">{provider?.displayName}</span>.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -100,6 +146,19 @@ export function UpdateAuthDialog({
           {fieldsLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : awaitingOtp ? (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="auth-otp">OTP Code</Label>
+                <Input
+                  id="auth-otp"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                />
+              </div>
             </div>
           ) : loginFields.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
@@ -145,15 +204,15 @@ export function UpdateAuthDialog({
           </DialogClose>
           <Button
             onClick={handleSubmit}
-            disabled={!allFilled || updateAuth.isPending}
+            disabled={awaitingOtp ? !otpFilled || updateAuth.isPending : !allFilled || updateAuth.isPending}
           >
             {updateAuth.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
+                {awaitingOtp ? "Verifying..." : "Saving..."}
               </>
             ) : (
-              "Save Credentials"
+              awaitingOtp ? "Verify OTP" : "Save Credentials"
             )}
           </Button>
         </DialogFooter>

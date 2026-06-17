@@ -115,7 +115,7 @@ export const PROVIDERS: Record<CompanyId, ProviderInfo> = {
     companyId: "oneZero",
     displayName: "Bank One Zero",
     type: "bank",
-    loginFields: ["email", "password", "otpLongTermToken"],
+    loginFields: ["email", "password", "phoneNumber"],
   },
   pagi: {
     companyId: "pagi",
