@@ -4,6 +4,7 @@ import type { Command } from "commander";
 import { resolve } from "path";
 import { existsSync } from "fs";
 import { confirm } from "@inquirer/prompts";
+import { readFile } from "../file-utils.js";
 import {
   validateCsvImport,
   buildTransactionInput,
@@ -51,7 +52,7 @@ export function registerImportCommand(program: Command): void {
       }
 
       // Read and validate CSV
-      const text = await Bun.file(filePath).text();
+      const text = await readFile(filePath);
       const validation = validateCsvImport(text);
 
       if (validation.errors.length > 0 && !opts.skipErrors) {
@@ -222,7 +223,7 @@ export function registerImportCommand(program: Command): void {
 
       // Execute import in a DB transaction
       const db = getDatabase();
-      db.run("BEGIN");
+      db.exec("BEGIN");
       try {
         for (const { input } of inputs) {
           const result = upsertTransaction(input);
@@ -230,9 +231,9 @@ export function registerImportCommand(program: Command): void {
           else if (result.action === "updated") updateCount++;
           else dupCount++;
         }
-        db.run("COMMIT");
+        db.exec("COMMIT");
       } catch (err) {
-        db.run("ROLLBACK");
+        db.exec("ROLLBACK");
         printError("IMPORT_ERROR", `Import failed: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(ExitCode.Error);
       }

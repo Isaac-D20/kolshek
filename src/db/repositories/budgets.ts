@@ -49,7 +49,7 @@ export function listBudgets(month?: string): Budget[] {
        WHERE month IS NULL OR month = $month
        ORDER BY category, month`,
     )
-    .all({ $month: month }) as BudgetRow[];
+    .all({ month: month }) as BudgetRow[];
 
   // For each category, prefer the month-specific row over the recurring one
   const byCategory = new Map<string, BudgetRow>();
@@ -75,16 +75,16 @@ export function setBudget(
      VALUES ($category, $month, $targetAmount)
      ON CONFLICT(category, month) DO UPDATE SET target_amount = $targetAmount`,
   ).run({
-    $category: category,
-    $month: month ?? null,
-    $targetAmount: targetAmount,
+    category: category,
+    month: month ?? null,
+    targetAmount: targetAmount,
   });
 
   const row = db
     .prepare(
       "SELECT * FROM budgets WHERE category = $category AND (month IS $month)",
     )
-    .get({ $category: category, $month: month ?? null }) as BudgetRow;
+    .get({ category: category, month: month ?? null }) as BudgetRow;
   return rowToBudget(row);
 }
 
@@ -95,7 +95,7 @@ export function deleteBudget(category: string, month?: string): boolean {
     .prepare(
       "DELETE FROM budgets WHERE category = $category AND (month IS $month)",
     )
-    .run({ $category: category, $month: month ?? null });
+    .run({ category: category, month: month ?? null });
   return result.changes > 0;
 }
 
@@ -135,7 +135,7 @@ export function getBudgetVsActual(month: string): BudgetComparison[] {
     GROUP BY category
   `;
 
-  const rows = db.prepare(sql).all({ $from: from, $to: to, ...excludeParams }) as Array<{
+  const rows = db.prepare(sql).all({ from: from, to: to, ...excludeParams }) as Array<{
     category: string;
     total_amount: number;
   }>;

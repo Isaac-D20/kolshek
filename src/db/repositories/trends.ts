@@ -57,7 +57,7 @@ export function getCategoryTrends(
 
   const params: Record<string, string | number> = {
     ...excludeParams,
-    $category: category,
+    category: category,
   };
   const conditions = [
     "t.charged_amount < 0",
@@ -65,9 +65,9 @@ export function getCategoryTrends(
     "COALESCE(t.category, 'Uncategorized') = $category",
   ];
 
-  if (range.from) { conditions.push("t.date >= $from"); params.$from = range.from; }
-  if (range.to) { conditions.push("t.date <= $to"); params.$to = range.to; }
-  if (providerType) { conditions.push("p.type = $providerType"); params.$providerType = providerType; }
+  if (range.from) { conditions.push("t.date >= $from"); params.from = range.from; }
+  if (range.to) { conditions.push("t.date <= $to"); params.to = range.to; }
+  if (providerType) { conditions.push("p.type = $providerType"); params.providerType = providerType; }
 
   const sql = `
     SELECT strftime('%Y-%m', t.date) AS month,
@@ -126,9 +126,9 @@ export function getFixedVariableTrends(
     excludeSQL,
   ];
 
-  if (range.from) { conditions.push("t.date >= $from"); params.$from = range.from; }
-  if (range.to) { conditions.push("t.date <= $to"); params.$to = range.to; }
-  if (providerType) { conditions.push("p.type = $providerType"); params.$providerType = providerType; }
+  if (range.from) { conditions.push("t.date >= $from"); params.from = range.from; }
+  if (range.to) { conditions.push("t.date <= $to"); params.to = range.to; }
+  if (providerType) { conditions.push("p.type = $providerType"); params.providerType = providerType; }
 
   // Get spending per merchant per month
   const sql = `

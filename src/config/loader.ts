@@ -1,4 +1,5 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import envPaths from "env-paths";
 import { parse } from "smol-toml";
@@ -36,11 +37,10 @@ export async function ensureDirectories(): Promise<void> {
 
 async function loadTomlConfig(): Promise<Record<string, unknown>> {
   const configPath = join(paths.config, "config.toml");
-  const file = Bun.file(configPath);
-  if (!(await file.exists())) {
+  if (!existsSync(configPath)) {
     return {};
   }
-  const text = await file.text();
+  const text = await readFile(configPath, "utf-8");
   return parse(text) as Record<string, unknown>;
 }
 

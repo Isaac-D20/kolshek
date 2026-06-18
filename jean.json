@@ -3,9 +3,9 @@
     "setup": null,
     "teardown": null,
     "run": [
-      "$env:KOLSHEK_DEV = \"1\"; bun run dev -- dashboard --no-open",
-      "bun run dev:web",
-      "bun run build:web"
+      "$env:KOLSHEK_DEV = \"1\"; npm run dev -- dashboard --no-open",
+      "npm run dev:web",
+      "npm run build:web"
     ]
   }
 }

@@ -2,7 +2,7 @@
 //
 // Three backends (checked in order):
 //   1. Environment variables (for CI/automation)
-//   2. OS keychain via Bun.secrets (Windows Credential Manager / macOS Keychain / Linux libsecret)
+//   2. OS keychain (currently disabled in Node port)
 //   3. Encrypted file (AES-256-GCM fallback when keychain unavailable, e.g. WSL)
 //
 // Credentials are stored as base64-encoded JSON in keychain,
@@ -30,8 +30,8 @@ function validateAlias(alias: string): void {
   if (typeof alias !== "string" || alias.length === 0 || alias.length > 64) {
     throw new Error("Invalid credential alias: must be 1-64 characters");
   }
-  if (!/^[a-zA-Z0-9_-]+$/.test(alias)) {
-    throw new Error("Invalid credential alias: only alphanumeric, dash, underscore allowed");
+  if (!/^[ a-zA-Z0-9_-]+$/.test(alias)) {
+    throw new Error("Invalid credential alias: only alphanumeric, dash, underscore, and space allowed");
   }
   if (alias === "__proto__" || alias === "constructor" || alias === "prototype") {
     throw new Error(`Reserved alias: ${alias}`);
@@ -71,19 +71,21 @@ function sanitizeError(err: unknown, secrets: string[]): Error {
 }
 
 // ---------------------------------------------------------------------------
-// OS keychain via Bun.secrets
+// OS keychain (Placeholder for Node port)
 // ---------------------------------------------------------------------------
 
-async function keychainStore(target: string, encoded: string): Promise<void> {
-  await Bun.secrets.set({ service: SERVICE, name: target, value: encoded });
+async function keychainStore(_target: string, _encoded: string): Promise<void> {
+  // OS keychain support requires native dependencies like 'keytar' or 'node-keytar'
+  // For the initial Node port, we fall back to the encrypted file backend.
+  throw new Error("OS keychain not supported in Node port. Using encrypted file fallback.");
 }
 
-async function keychainRead(target: string): Promise<string | null> {
-  return Bun.secrets.get({ service: SERVICE, name: target });
+async function keychainRead(_target: string): Promise<string | null> {
+  return null;
 }
 
-async function keychainDelete(target: string): Promise<boolean> {
-  return Bun.secrets.delete({ service: SERVICE, name: target });
+async function keychainDelete(_target: string): Promise<boolean> {
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -244,29 +246,22 @@ export function getCredentialSource(): "keychain" | "env" | "file" {
   // Check if encrypted credentials file exists (fallback)
   if (existsSync(credentialsEncPath())) return "file";
 
-  return "keychain";
+  return "keychain"; // Default to keychain in Node port
 }
 
-// Cached keychain support result — avoids repeated probe writes.
-let _keychainSupported: boolean | null = null;
+// Cached keychain support result — disabled in Node port since keychain support is disabled.
+// Not used in Node port since keychain support is disabled.
 
 // Test if the OS keychain is available on this platform.
 // Result is cached after the first successful probe.
 export async function hasKeychainSupport(): Promise<boolean> {
-  if (_keychainSupported !== null) return _keychainSupported;
-  try {
-    await Bun.secrets.set({ service: SERVICE, name: "__kolshek_probe__", value: "p" });
-    await Bun.secrets.delete({ service: SERVICE, name: "__kolshek_probe__" });
-    _keychainSupported = true;
-  } catch {
-    _keychainSupported = false;
-  }
-  return _keychainSupported;
+  // OS keychain disabled in initial Node port
+  return false;
 }
 
 // Reset the cached keychain support result (for testing).
 export function resetKeychainCache(): void {
-  _keychainSupported = null;
+  //__keychainSupported = null;
 }
 
 // Store credentials for a provider.

@@ -8,7 +8,7 @@ import {
   type ScraperOptions,
   type ScraperCredentials,
 } from "israeli-bank-scrapers-core";
-import { ScraperErrorTypes } from "israeli-bank-scrapers-core/lib/scrapers/errors";
+import { ScraperErrorTypes } from "israeli-bank-scrapers-core/lib/scrapers/errors.js";
 import { sanitizeErrorMessage } from "./sanitize.js";
 
 // ---------------------------------------------------------------------------

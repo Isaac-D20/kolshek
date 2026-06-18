@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { getAppPaths } from "../config/loader.js";
 import { fetchLatestRelease, parseVersion, isNewer } from "./commands/update.js";
-import pkg from "../../package.json";
+import pkg from "../../package.json" with { type: 'json' };
 
 interface UpdateCache {
   latestVersion: string;

@@ -6,11 +6,15 @@
  * Run before: bun build --compile
  */
 
-import { readdirSync, readFileSync, statSync } from "fs";
+import {
+  readdirSync, readFileSync, statSync, writeFileSync,
+} from "fs";
 import { join, relative } from "path";
+import { fileURLToPath } from "url";
 
-const PLUGIN_DIR = join(import.meta.dir, "..", "plugin");
-const OUT_FILE = join(import.meta.dir, "..", "src", "cli", "plugin-files.ts");
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const PLUGIN_DIR = join(__dirname, "..", "plugin");
+const OUT_FILE = join(__dirname, "..", "src", "cli", "plugin-files.ts");
 
 interface ToolFiles {
   [relativePath: string]: string;
@@ -122,7 +126,7 @@ for (const [tool, files] of Object.entries(bundle)) {
 lines.push("};");
 lines.push("");
 
-await Bun.write(OUT_FILE, lines.join("\n"));
+writeFileSync(OUT_FILE, lines.join("\n"));
 
 const toolCount = Object.keys(bundle).length;
 const fileCount = Object.values(bundle).reduce((sum, files) => sum + Object.keys(files).length, 0);

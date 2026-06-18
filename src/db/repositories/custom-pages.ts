@@ -79,7 +79,7 @@ export function getCustomPage(id: string): CustomPageFull | null {
     .prepare(
       "SELECT id, title, icon, description, definition, sort_order, created_at, updated_at FROM custom_pages WHERE id = $id",
     )
-    .get({ $id: id }) as CustomPageRow | null;
+    .get({ id: id }) as CustomPageRow | null;
   return row ? rowToFull(row) : null;
 }
 
@@ -96,12 +96,12 @@ export function createCustomPage(input: CreatePageInput): CustomPageFull {
     `INSERT INTO custom_pages (id, title, icon, description, definition, sort_order)
      VALUES ($id, $title, $icon, $description, $definition, $sortOrder)`,
   ).run({
-    $id: input.id,
-    $title: input.title,
-    $icon: input.icon ?? "file-text",
-    $description: input.description ?? null,
-    $definition: JSON.stringify(input.definition),
-    $sortOrder: maxRow.max_order + 1,
+    id: input.id,
+    title: input.title,
+    icon: input.icon ?? "file-text",
+    description: input.description ?? null,
+    definition: JSON.stringify(input.definition),
+    sortOrder: maxRow.max_order + 1,
   });
 
   return getCustomPage(input.id)!;
@@ -117,23 +117,23 @@ export function updateCustomPage(
   if (!existing) return null;
 
   const sets: string[] = ["updated_at = datetime('now')"];
-  const params: Record<string, string | number | null> = { $id: id };
+  const params: Record<string, string | number | null> = { id: id };
 
   if (updates.title !== undefined) {
     sets.push("title = $title");
-    params.$title = updates.title;
+    params.title = updates.title;
   }
   if (updates.icon !== undefined) {
     sets.push("icon = $icon");
-    params.$icon = updates.icon;
+    params.icon = updates.icon;
   }
   if (updates.description !== undefined) {
     sets.push("description = $description");
-    params.$description = updates.description;
+    params.description = updates.description;
   }
   if (updates.definition !== undefined) {
     sets.push("definition = $definition");
-    params.$definition = JSON.stringify(updates.definition);
+    params.definition = JSON.stringify(updates.definition);
   }
 
   db.prepare(`UPDATE custom_pages SET ${sets.join(", ")} WHERE id = $id`).run(params);
@@ -145,7 +145,7 @@ export function deleteCustomPage(id: string): boolean {
   const db = getDatabase();
   const result = db
     .prepare("DELETE FROM custom_pages WHERE id = $id")
-    .run({ $id: id });
+    .run({ id: id });
   return result.changes > 0;
 }
 
@@ -156,6 +156,6 @@ export function reorderCustomPages(ids: string[]): void {
     "UPDATE custom_pages SET sort_order = $order, updated_at = datetime('now') WHERE id = $id",
   );
   for (let i = 0; i < ids.length; i++) {
-    stmt.run({ $id: ids[i], $order: i });
+    stmt.run({ id: ids[i], order: i });
   }
 }

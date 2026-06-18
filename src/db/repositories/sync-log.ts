@@ -42,9 +42,9 @@ export function createSyncLog(
        RETURNING *`,
     )
     .get({
-      $providerId: providerId,
-      $scrapeStartDate: scrapeStartDate,
-      $scrapeEndDate: scrapeEndDate,
+      providerId: providerId,
+      scrapeStartDate: scrapeStartDate,
+      scrapeEndDate: scrapeEndDate,
     }) as SyncLogRow;
 
   return rowToSyncLog(row);
@@ -67,11 +67,11 @@ export function completeSyncLog(
        error_message = $errorMessage
      WHERE id = $id`,
   ).run({
-    $id: id,
-    $status: status,
-    $transactionsAdded: transactionsAdded,
-    $transactionsUpdated: transactionsUpdated,
-    $errorMessage: errorMessage ?? null,
+    id: id,
+    status: status,
+    transactionsAdded: transactionsAdded,
+    transactionsUpdated: transactionsUpdated,
+    errorMessage: errorMessage ?? null,
   });
 }
 
@@ -84,7 +84,7 @@ export function getLastSuccessfulSync(providerId: number): SyncLog | null {
        ORDER BY started_at DESC
        LIMIT 1`,
     )
-    .get({ $providerId: providerId }) as SyncLogRow | null;
+    .get({ providerId: providerId }) as SyncLogRow | null;
 
   return row ? rowToSyncLog(row) : null;
 }
@@ -98,7 +98,7 @@ export function getLatestCompletedSyncLog(providerId: number): SyncLog | null {
        ORDER BY started_at DESC
        LIMIT 1`,
     )
-    .get({ $providerId: providerId }) as SyncLogRow | null;
+    .get({ providerId: providerId }) as SyncLogRow | null;
 
   return row ? rowToSyncLog(row) : null;
 }
@@ -125,7 +125,7 @@ export function listRecentSyncLogs(limit = 20): SyncLogWithProvider[] {
        ORDER BY sl.started_at DESC
        LIMIT $limit`,
     )
-    .all({ $limit: limit }) as SyncLogWithProviderRow[];
+    .all({ limit: limit }) as SyncLogWithProviderRow[];
 
   return rows.map((row) => ({
     ...rowToSyncLog(row),
@@ -142,7 +142,7 @@ export function countSyncLogsSince(since: string): number {
       `SELECT COUNT(*) AS cnt FROM sync_log
        WHERE started_at >= $since AND status != 'running'`,
     )
-    .get({ $since: since }) as { cnt: number };
+    .get({ since: since }) as { cnt: number };
   return row.cnt;
 }
 
@@ -156,7 +156,7 @@ export function countConsecutiveFailures(providerId: number): number {
        ORDER BY started_at DESC
        LIMIT 10`,
     )
-    .all({ $providerId: providerId }) as { status: string }[];
+    .all({ providerId: providerId }) as { status: string }[];
 
   let count = 0;
   for (const row of rows) {
@@ -174,7 +174,7 @@ export function hasSuccessfulSync(providerId: number): boolean {
        WHERE provider_id = $providerId AND status = 'success'
        LIMIT 1`,
     )
-    .get({ $providerId: providerId });
+    .get({ providerId: providerId });
 
   return row != null;
 }

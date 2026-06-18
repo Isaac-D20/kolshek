@@ -1,6 +1,7 @@
 // kolshek page — manage custom dashboard pages.
 
 import type { Command } from "commander";
+import { readFile, fileExists, readStdin } from "../file-utils.js";
 import {
   listCustomPages,
   getCustomPage,
@@ -78,8 +79,7 @@ export function registerPageCommand(program: Command): void {
       let jsonStr: string;
 
       if (opts.file) {
-        const file = Bun.file(opts.file);
-        if (!(await file.exists())) {
+        if (!fileExists(opts.file)) {
           if (isJsonMode()) {
             printJson(jsonError("FILE_NOT_FOUND", `File not found: ${opts.file}`));
           } else {
@@ -88,17 +88,10 @@ export function registerPageCommand(program: Command): void {
           process.exit(1);
           return;
         }
-        jsonStr = await file.text();
+        jsonStr = await readFile(opts.file);
       } else {
         // Read from stdin
-        const chunks: string[] = [];
-        const reader = Bun.stdin.stream().getReader();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(new TextDecoder().decode(value));
-        }
-        jsonStr = chunks.join("");
+        jsonStr = await readStdin();
       }
 
       let parsed: unknown;

@@ -27,6 +27,7 @@ export interface ProviderCard extends Provider {
   accountCount: number;
   accounts: ProviderAccount[];
   transactionCount: number;
+  requiresOtp?: boolean;
 }
 
 export interface Account {

@@ -1,6 +1,7 @@
 // kolshek translate — Manage translation rules and apply them to transactions.
 
 import type { Command } from "commander";
+import { readFile, fileExists, readStdin } from "../file-utils.js";
 import {
   createTranslationRule,
   listTranslationRules,
@@ -130,12 +131,11 @@ export function registerTranslateCommand(program: Command): void {
       let rawJson: string;
 
       if (filePath) {
-        const file = Bun.file(filePath);
-        if (!(await file.exists())) {
+        if (!fileExists(filePath)) {
           printError("NOT_FOUND", `File not found: ${filePath}`);
           process.exit(ExitCode.BadArgs);
         }
-        rawJson = await file.text();
+        rawJson = await readFile(filePath);
       } else {
         if (process.stdin.isTTY) {
           printError(
@@ -146,7 +146,7 @@ export function registerTranslateCommand(program: Command): void {
           );
           process.exit(ExitCode.BadArgs);
         }
-        rawJson = await new Response(Bun.stdin.stream()).text();
+        rawJson = await readStdin();
       }
 
       let parsed: unknown;

@@ -5,6 +5,8 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdir, unlink } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { writeFile } from "../../cli/file-utils.js";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
@@ -61,8 +63,8 @@ async function hasSystemd(): Promise<boolean> {
 
 async function systemdRegister(config: ScheduleConfig): Promise<void> {
   await mkdir(SYSTEMD_DIR, { recursive: true });
-  await Bun.write(SERVICE_PATH, buildService(config));
-  await Bun.write(TIMER_PATH, buildTimer(config));
+  await writeFile(SERVICE_PATH, buildService(config));
+  await writeFile(TIMER_PATH, buildTimer(config));
   await run(["systemctl", "--user", "daemon-reload"]);
   await run(["systemctl", "--user", "enable", "--now", `${UNIT_NAME}.timer`]);
 }
@@ -77,8 +79,7 @@ async function systemdUnregister(): Promise<void> {
 }
 
 async function systemdIsRegistered(): Promise<boolean> {
-  const file = Bun.file(TIMER_PATH);
-  return await file.exists();
+  return existsSync(TIMER_PATH);
 }
 
 // ---------------------------------------------------------------------------

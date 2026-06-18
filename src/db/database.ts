@@ -1,24 +1,24 @@
-import { Database } from "bun:sqlite";
+import Database from "better-sqlite3";
 import { existsSync } from "fs";
 import { restrictPathToOwner } from "../security/permissions.js";
 
-let _db: Database | null = null;
+let _db: any | null = null;
 
 /**
  * Initialize the SQLite database: open, configure pragmas, run migrations.
  */
-export function initDatabase(dbPath: string): Database {
+export function initDatabase(dbPath: string): any {
   if (_db) return _db;
 
-  const db = new Database(dbPath, { create: true });
+  const db = new Database(dbPath);
 
   // Restrict DB file permissions (Unix: chmod, Windows: icacls)
   restrictPathToOwner(dbPath);
 
-  db.run("PRAGMA journal_mode=WAL");
-  db.run("PRAGMA foreign_keys=ON");
-  db.run("PRAGMA busy_timeout=5000");
-  db.run("PRAGMA temp_store=2");
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+  db.pragma("busy_timeout = 5000");
+  db.pragma("temp_store = 2");
 
   runMigrations(db);
 
@@ -35,7 +35,7 @@ export function initDatabase(dbPath: string): Database {
 /**
  * Get the singleton database instance. Throws if not initialized.
  */
-export function getDatabase(): Database {
+export function getDatabase(): any {
   if (!_db) {
     throw new Error("Database not initialized. Call initDatabase() first.");
   }
@@ -52,8 +52,8 @@ export function closeDatabase(): void {
   }
 }
 
-// Migrations embedded as strings so they survive bun build --compile
-// (the compiled binary cannot read .sql files from disk).
+// Migrations embedded as strings to ensure they are always available
+// (this pattern also works well for compiled binaries).
 const MIGRATIONS: [string, string][] = [
   ["001_initial.sql", `-- KolShek initial schema
 -- Providers: banks and credit card companies
@@ -305,10 +305,12 @@ CREATE TABLE IF NOT EXISTS budgets (
 );`],
 ];
 
-// Run all pending SQL migrations.
-// Tracks applied migrations in a _migrations table.
-function runMigrations(db: Database): void {
-  db.run(`
+/**
+ * Run all pending SQL migrations.
+ * Tracks applied migrations in a _migrations table.
+ */
+function runMigrations(db: any): void {
+  db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
       name TEXT NOT NULL UNIQUE,
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -317,14 +319,12 @@ function runMigrations(db: Database): void {
 
   for (const [name, sql] of MIGRATIONS) {
     const applied = db
-      .prepare("SELECT 1 FROM _migrations WHERE name = $name")
-      .get({ $name: name });
+      .prepare("SELECT 1 FROM _migrations WHERE name = ?")
+      .get(name);
 
     if (!applied) {
       db.exec(sql);
-      db.prepare("INSERT INTO _migrations (name) VALUES ($name)").run({
-        $name: name,
-      });
+      db.prepare("INSERT INTO _migrations (name) VALUES (?)").run(name);
     }
   }
 
@@ -334,7 +334,7 @@ function runMigrations(db: Database): void {
   for (const [, sql] of MIGRATIONS) {
     const createStmts = sql
       .split(";")
-      .filter((s) => /CREATE TABLE IF NOT EXISTS/i.test(s));
+      .filter((s: string) => /CREATE TABLE IF NOT EXISTS/i.test(s));
     for (const stmt of createStmts) {
       db.exec(stmt.trim());
     }

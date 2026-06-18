@@ -6,6 +6,8 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdir, unlink } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { writeFile } from "../../cli/file-utils.js";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
@@ -51,7 +53,7 @@ const backend: SchedulerBackend = {
     } catch { /* may not exist */ }
 
     await mkdir(PLIST_DIR, { recursive: true });
-    await Bun.write(PLIST_PATH, buildPlist(config));
+    await writeFile(PLIST_PATH, buildPlist(config));
     await run(["launchctl", "load", PLIST_PATH]);
   },
 
@@ -62,8 +64,7 @@ const backend: SchedulerBackend = {
 
   async isRegistered(): Promise<boolean> {
     try {
-      const file = Bun.file(PLIST_PATH);
-      return await file.exists();
+      return existsSync(PLIST_PATH);
     } catch {
       return false;
     }

@@ -37,10 +37,10 @@ export function createProvider(
        RETURNING *`,
     )
     .get({
-      $companyId: companyId,
-      $alias: alias ?? companyId,
-      $displayName: displayName,
-      $type: type,
+      companyId: companyId,
+      alias: alias ?? companyId,
+      displayName: displayName,
+      type: type,
     }) as ProviderRow;
 
   return rowToProvider(row);
@@ -50,7 +50,7 @@ export function getProvider(id: number): Provider | null {
   const db = getDatabase();
   const row = db
     .prepare("SELECT * FROM providers WHERE id = $id")
-    .get({ $id: id }) as ProviderRow | null;
+    .get({ id: id }) as ProviderRow | null;
 
   return row ? rowToProvider(row) : null;
 }
@@ -59,7 +59,7 @@ export function getProviderByCompanyId(companyId: string): Provider | null {
   const db = getDatabase();
   const row = db
     .prepare("SELECT * FROM providers WHERE company_id = $companyId")
-    .get({ $companyId: companyId }) as ProviderRow | null;
+    .get({ companyId: companyId }) as ProviderRow | null;
 
   return row ? rowToProvider(row) : null;
 }
@@ -68,7 +68,7 @@ export function getProvidersByCompanyId(companyId: string): Provider[] {
   const db = getDatabase();
   const rows = db
     .prepare("SELECT * FROM providers WHERE company_id = $companyId ORDER BY alias")
-    .all({ $companyId: companyId }) as ProviderRow[];
+    .all({ companyId: companyId }) as ProviderRow[];
 
   return rows.map(rowToProvider);
 }
@@ -77,7 +77,7 @@ export function getProviderByAlias(alias: string): Provider | null {
   const db = getDatabase();
   const row = db
     .prepare("SELECT * FROM providers WHERE alias = $alias")
-    .get({ $alias: alias }) as ProviderRow | null;
+    .get({ alias: alias }) as ProviderRow | null;
 
   return row ? rowToProvider(row) : null;
 }
@@ -115,7 +115,7 @@ export function updateLastSynced(id: number, timestamp: string): void {
   const db = getDatabase();
   db.prepare(
     "UPDATE providers SET last_synced_at = $timestamp WHERE id = $id",
-  ).run({ $id: id, $timestamp: timestamp });
+  ).run({ id: id, timestamp: timestamp });
 }
 
 export function getMostRecentSyncTime(): string | null {
@@ -129,5 +129,5 @@ export function getMostRecentSyncTime(): string | null {
 
 export function deleteProvider(id: number): void {
   const db = getDatabase();
-  db.prepare("DELETE FROM providers WHERE id = $id").run({ $id: id });
+  db.prepare("DELETE FROM providers WHERE id = $id").run({ id: id });
 }

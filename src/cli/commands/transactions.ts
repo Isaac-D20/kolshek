@@ -4,6 +4,7 @@
 
 import type { Command } from "commander";
 import { resolve, relative } from "path";
+import { writeFile } from "../file-utils.js";
 import {
   listTransactions,
   searchTransactions,
@@ -290,7 +291,7 @@ export function registerTransactionsCommand(program: Command): void {
           });
           process.exit(ExitCode.BadArgs);
         }
-        await Bun.write(resolved, output);
+        await writeFile(resolved, output);
         if (!isJsonMode()) {
           info(`Exported ${txns.length} transactions to ${opts.output}`);
         }
