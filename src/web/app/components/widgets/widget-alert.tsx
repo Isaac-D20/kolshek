@@ -126,7 +126,6 @@ function AlertSkeleton() {
 }
 
 export default function WidgetAlert({ config, data }: WidgetProps) {
-  const valueKey = config.valueKey as string | undefined;
   const operator = (config.operator as string) || "gt";
   const threshold = config.threshold as number | undefined;
   const severity = (config.severity as Severity) || "info";
@@ -141,7 +140,7 @@ export default function WidgetAlert({ config, data }: WidgetProps) {
   }
 
   // Resolve value
-  const rawValue = valueKey ? resolvePath(data, valueKey) : data;
+  const rawValue = (data as any)?.value;
   const numericValue = typeof rawValue === "number" ? rawValue : Number(rawValue);
 
   // Cannot evaluate without a valid value and threshold

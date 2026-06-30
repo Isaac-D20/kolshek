@@ -130,6 +130,7 @@ const comparisonSchema = z.object({
   queries: z.tuple([querySchema, querySchema]),
   labels: z.tuple([z.string(), z.string()]).optional(),
   format: z.enum(["currency", "number", "percent"]).optional(),
+  higherIsBetter: z.boolean().optional(),
 });
 
 const alertSchema = z.object({
@@ -147,18 +148,18 @@ const textSchema = z.object({
   type: z.literal("text"),
   content: z.string(),
   size: z.enum(["sm", "base", "lg", "xl"]).optional(),
+  wrapped: z.boolean().optional(),
 });
 
 const filterBarSchema = z.object({
   ...baseWidget,
   type: z.literal("filter-bar"),
-  filters: z.array(z.enum(["dateRange", "category", "merchant", "account", "direction"])),
+  filters: z.array(z.enum(["dateRange", "category", "provider", "direction"])),
 });
 
 // Layout widgets need forward reference via z.lazy()
 
-const gridSchema: z.ZodType<unknown> = z.lazy(() =>
-  z.object({
+const gridSchema = z.object({
     ...baseWidget,
     type: z.literal("grid"),
     columns: z.object({
@@ -166,31 +167,26 @@ const gridSchema: z.ZodType<unknown> = z.lazy(() =>
       md: z.number().int().min(1).max(12).optional(),
       lg: z.number().int().min(1).max(12).optional(),
     }).optional(),
-    children: z.array(widgetSchema).min(1).max(50),
-  }),
-);
+    children: z.lazy(() => z.array(widgetSchema).min(1).max(50)),
+});
 
-const stackSchema: z.ZodType<unknown> = z.lazy(() =>
-  z.object({
+const stackSchema = z.object({
     ...baseWidget,
     type: z.literal("stack"),
     direction: z.enum(["vertical", "horizontal"]).optional(),
     gap: z.number().int().min(0).max(16).optional(),
-    children: z.array(widgetSchema).min(1).max(50),
-  }),
-);
+    children: z.lazy(() => z.array(widgetSchema).min(1).max(50)),
+});
 
-const tabsSchema: z.ZodType<unknown> = z.lazy(() =>
-  z.object({
+const tabsSchema = z.object({
     ...baseWidget,
     type: z.literal("tabs"),
     tabs: z.array(z.object({
       label: z.string(),
       value: z.string(),
-      children: z.array(widgetSchema).min(1).max(50),
+      children: z.lazy(() => z.array(widgetSchema).min(1).max(50)),
     })).min(1).max(10),
-  }),
-);
+});
 
 export const widgetSchema: z.ZodType<unknown> = z.lazy(() =>
   z.discriminatedUnion("type", [
@@ -214,7 +210,7 @@ export const pageDefinitionSchema = z.object({
   title: z.string().min(1).max(100),
   icon: z.string().default("file-text"),
   description: z.string().max(500).optional(),
-  layout: widgetSchema,
+  definition: widgetSchema,
 });
 
 export type PageDefinition = z.infer<typeof pageDefinitionSchema>;
@@ -271,11 +267,11 @@ const MAX_DEPTH = 5;
 export function validatePage(input: unknown): { success: true; data: PageDefinition } | { success: false; error: string } {
   try {
     const page = validatePageDefinition(input);
-    const widgets = countWidgets(page.layout);
+    const widgets = countWidgets(page.definition);
     if (widgets > MAX_WIDGETS) {
       return { success: false, error: `Too many widgets (${widgets}/${MAX_WIDGETS})` };
     }
-    const depth = maxDepth(page.layout);
+    const depth = maxDepth(page.definition);
     if (depth > MAX_DEPTH) {
       return { success: false, error: `Nesting too deep (${depth}/${MAX_DEPTH})` };
     }

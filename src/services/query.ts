@@ -65,7 +65,7 @@ function buildFilterConditions(filters?: Record<string, unknown>): FilterBuildRe
   const f = (filters ?? {}) as Record<string, unknown>;
   const { from, to } = parsePeriod(f.period as string | undefined);
   const conditions: string[] = ["t.date >= $from", "t.date <= $to"];
-  const params: SqlParams = { $from: from, $to: to };
+  const params: SqlParams = { from: from, to: to };
 
   // Direction filter
   const dir = f.direction as string | undefined;
@@ -80,7 +80,7 @@ function buildFilterConditions(filters?: Record<string, unknown>): FilterBuildRe
   if (categories && categories.length > 0) {
     const placeholders = categories.map((_, i) => `$cat_${i}`);
     conditions.push(`COALESCE(t.category, 'Uncategorized') IN (${placeholders.join(", ")})`);
-    categories.forEach((c, i) => { params[`$cat_${i}`] = c; });
+    categories.forEach((c, i) => { params[`cat_${i}`] = c; });
   }
 
   // Merchant filter (glob patterns)
@@ -100,11 +100,11 @@ function buildFilterConditions(filters?: Record<string, unknown>): FilterBuildRe
   // Amount range
   if (typeof f.amountMin === "number") {
     conditions.push("ABS(t.charged_amount) >= $amountMin");
-    params.$amountMin = f.amountMin;
+    params.amountMin = f.amountMin;
   }
   if (typeof f.amountMax === "number") {
     conditions.push("ABS(t.charged_amount) <= $amountMax");
-    params.$amountMax = f.amountMax;
+    params.amountMax = f.amountMax;
   }
 
   // Account filter
@@ -119,14 +119,13 @@ function buildFilterConditions(filters?: Record<string, unknown>): FilterBuildRe
   const txType = f.type as string | undefined;
   if (txType && txType !== "all") {
     conditions.push("t.type = $txType");
-    params.$txType = txType;
+    params.txType = txType;
   }
 
   // Default: exclude cc_billing for spending queries
   const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(DEFAULT_REPORT_EXCLUDES);
   conditions.push(excludeSQL);
   Object.assign(params, excludeParams);
-
   return { conditions, params, from, to };
 }
 
@@ -173,7 +172,7 @@ function executeAggregateQuery(query: Extract<WidgetQuery, { type: "aggregate" }
       const duration = new Date(to).getTime() - new Date(from).getTime();
       const prevFrom = new Date(new Date(from).getTime() - duration).toISOString().slice(0, 10);
       const prevTo = from;
-      const prevParams = { ...params, $from: prevFrom, $to: prevTo };
+      const prevParams = { ...params, from: prevFrom, to: prevTo };
       const prevRow = db.prepare(sql).get(prevParams) as { value: number | null; cnt: number };
       const prev = prevRow.value ?? 0;
       const curr = row.value ?? 0;
@@ -368,7 +367,7 @@ function executeTransactionsQuery(query: Extract<WidgetQuery, { type: "transacti
   `;
 
   const countRow = db.prepare(countSql).get(params) as { total: number };
-  const rows = db.prepare(sql).all({ ...params, $limit: limit, $offset: offset }) as Array<{
+  const rows = db.prepare(sql).all({ ...params, limit: limit, offset: offset }) as Array<{
     id: number;
     date: string;
     description: string;

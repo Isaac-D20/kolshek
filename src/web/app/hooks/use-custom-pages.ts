@@ -6,6 +6,14 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
 // Types matching the server response shapes
+export interface CreatePageInput {
+  id: string;
+  title: string;
+  icon?: string;
+  description?: string;
+  definition: Record<string, unknown>;
+}
+
 export interface CustomPageMeta {
   id: string;
   title: string;
@@ -100,6 +108,28 @@ export function usePageEvents() {
 
     return () => eventSource.close();
   }, [queryClient]);
+}
+
+// Create a new custom page
+export function useCreatePage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (page: CreatePageInput) => api.post<CustomPageFull>("/api/v2/pages", page),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customPages.all });
+    },
+  });
+}
+
+// Update a custom page
+export function useUpdatePage() {
+    const queryClient = useQueryClient();
+    return useMutation({
+    mutationFn: (id: string) => api.put<CustomPageFull>(`/api/v2/pages/${id}`, page),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customPages.all });
+    },
+  });
 }
 
 // Delete a custom page

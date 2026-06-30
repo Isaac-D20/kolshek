@@ -10,9 +10,9 @@ function gapToRem(gap: number): string {
 
 export default function WidgetGrid({ config, renderWidget }: LayoutWidgetProps) {
   const children = (config.children as Record<string, unknown>[]) || [];
-  const colsSm = (config.colsSm as number) || 1;
-  const colsMd = (config.colsMd as number) || 2;
-  const colsLg = (config.colsLg as number) || 3;
+  const colsSm = ((config.columns as any)?.sm as number) || 1;
+  const colsMd = ((config.columns as any)?.md as number) || 2;
+  const colsLg = ((config.columns as any)?.lg as number) || 3;
   const gap = (config.gap as number) || 4;
 
   // Unique id for scoped responsive styles

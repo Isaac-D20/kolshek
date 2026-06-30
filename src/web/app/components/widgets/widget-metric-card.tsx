@@ -10,18 +10,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type { WidgetProps } from "./widget-registry.js";
 
-// Resolve a numeric value from data using a dotted key path
-function resolvePath(obj: unknown, path: string): unknown {
-  if (obj == null || !path) return undefined;
-  const parts = path.split(".");
-  let current: any = obj;
-  for (const part of parts) {
-    if (current == null) return undefined;
-    current = current[part];
-  }
-  return current;
-}
-
 // Format a value based on the requested format type
 function formatValue(
   value: number,
@@ -56,10 +44,8 @@ function MetricCardSkeleton() {
 
 export default function WidgetMetricCard({ config, data }: WidgetProps) {
   const title = (config.title as string) || "Metric";
-  const valueKey = config.valueKey as string | undefined;
   const format = config.format as string | undefined;
   const currency = config.currency as string | undefined;
-  const comparisonKey = config.comparisonKey as string | undefined;
   // "higher_is_better" (default true) controls color logic
   const higherIsBetter = config.higherIsBetter !== false;
 
@@ -69,14 +55,13 @@ export default function WidgetMetricCard({ config, data }: WidgetProps) {
   }
 
   // Resolve the primary value
-  const rawValue = valueKey ? resolvePath(data, valueKey) : data;
-  const numericValue = typeof rawValue === "number" ? rawValue : Number(rawValue);
+  const numericValue = Number((data as any)?.value);
   const isValid = !Number.isNaN(numericValue);
 
   // Resolve comparison value (previous period, target, etc.)
-  const rawComparison = comparisonKey ? resolvePath(data, comparisonKey) : undefined;
-  const comparisonValue =
-    rawComparison != null ? Number(rawComparison) : undefined;
+  const comparisonValue = (data as any)?.comparison != null
+        ? Number((data as any).comparison)
+        : undefined;
   const hasComparison =
     comparisonValue != null && !Number.isNaN(comparisonValue) && comparisonValue !== 0;
 

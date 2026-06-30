@@ -19,10 +19,11 @@ export function useCategorySummary() {
   });
 }
 
-export function useCategoryList() {
+export function useCategoryList(enabled = true) {
   return useQuery({
     queryKey: queryKeys.categories.list(),
     queryFn: () => api.get<string[]>("/api/v2/categories/all"),
+    enabled: enabled
   });
 }
 

@@ -25,18 +25,20 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type { WidgetProps } from "./widget-registry.js";
 
-// Solid color palette -- no gradients
+// Color palette for chart bars
 const CHART_COLORS = [
-  "#6366f1",
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#f43f5e",
-  "#8b5cf6",
-  "#06b6d4",
-  "#f97316",
-  "#14b8a6",
-  "#ec4899",
+  "#3b82f6", // blue
+  "#10b981", // emerald
+  "#8b5cf6", // purple
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#06b6d4", // cyan
+  "#f97316", // orange
+  "#6366f1", // indigo
+  "#14b8a6", // teal
+  "#ec4899", // pink
+  "#84cc16", // lime
+  "#d946ef", // fuchsia
 ];
 
 // Custom tooltip matching existing project style
@@ -51,7 +53,7 @@ function ChartTooltip({ active, payload, label, valueFormat }: any) {
             className="mr-1.5 inline-block h-2 w-2 rounded-[2px]"
             style={{ backgroundColor: entry.color }}
           />
-          {entry.name}:{" "}
+          {entry.label ?? entry.name}:{" "}
           {valueFormat === "currency"
             ? formatCurrency(entry.value)
             : typeof entry.value === "number"
@@ -69,13 +71,13 @@ function PieTooltip({ active, payload, valueFormat }: any) {
   const item = payload[0].payload;
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-sm">
-      <p className="text-[13px] font-medium">{item.name}</p>
+      <p className="text-[13px] font-medium">{item.label ?? item.name}</p>
       <p className="text-xs text-muted-foreground tabular-nums">
         {valueFormat === "currency"
           ? formatCurrency(item.value)
           : typeof item.value === "number"
             ? item.value.toLocaleString()
-            : item.value}
+            : item.value} ({item.percentage.toFixed(1)}%)
       </p>
     </div>
   );
@@ -99,9 +101,6 @@ export default function WidgetChart({ config, data }: WidgetProps) {
   const chartType = (config.chartType as string) || "line";
   const height = (config.height as number) || 300;
   const dataKey = (config.dataKey as string) || "value";
-  const nameKey = (config.nameKey as string) || "name";
-  const xAxisKey = (config.xAxisKey as string) || "label";
-  const valueFormat = config.valueFormat as string | undefined;
   // Multiple series support for line/bar/area
   const series = config.series as Array<{ dataKey: string; name: string; color?: string }> | undefined;
   // Custom colors override
@@ -112,7 +111,9 @@ export default function WidgetChart({ config, data }: WidgetProps) {
     return <ChartSkeleton height={height} />;
   }
 
-  const chartData = Array.isArray(data) ? data : [];
+  const isPie = chartType === "pie" || chartType === "donut";
+  const isDonut = chartType === "donut";
+  const chartData = isPie ? (data as any).groups ?? [] : (data as any).points ?? [];
 
   if (chartData.length === 0) {
     return (
@@ -131,8 +132,6 @@ export default function WidgetChart({ config, data }: WidgetProps) {
     );
   }
 
-  const isPie = chartType === "pie" || chartType === "donut";
-
   return (
     <Card>
       {title && (
@@ -143,14 +142,14 @@ export default function WidgetChart({ config, data }: WidgetProps) {
         </CardHeader>
       )}
       <CardContent>
-        <div style={{ height }}>
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="grid place-items-center" style={{ height }}>
+          <ResponsiveContainer width="100%" height="100%" className="[grid-area:1/1]">
             {isPie ? (
               <PieChart>
                 <Pie
                   data={chartData}
                   dataKey={dataKey}
-                  nameKey={nameKey}
+                  nameKey="label"
                   cx="50%"
                   cy="50%"
                   innerRadius={chartType === "donut" ? "55%" : 0}
@@ -165,7 +164,7 @@ export default function WidgetChart({ config, data }: WidgetProps) {
                     />
                   ))}
                 </Pie>
-                <Tooltip content={<PieTooltip valueFormat={valueFormat} />} />
+                <Tooltip content={<PieTooltip valueFormat="currency" />} />
               </PieChart>
             ) : chartType === "bar" ? (
               <BarChart
@@ -178,7 +177,7 @@ export default function WidgetChart({ config, data }: WidgetProps) {
                   vertical={false}
                 />
                 <XAxis
-                  dataKey={xAxisKey}
+                  dataKey="date"
                   tick={{ fontSize: 12 }}
                   className="text-xs"
                   tickLine={false}
@@ -188,13 +187,9 @@ export default function WidgetChart({ config, data }: WidgetProps) {
                   tick={{ fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={
-                    valueFormat === "currency"
-                      ? (v: number) => formatCurrency(v)
-                      : undefined
-                  }
+                  tickFormatter={(v: number) => formatCurrency(v)}
                 />
-                <Tooltip content={<ChartTooltip valueFormat={valueFormat} />} />
+                <Tooltip content={<ChartTooltip valueFormat="currency" />} />
                 {series ? (
                   series.map((s, i) => (
                     <Bar
@@ -224,7 +219,7 @@ export default function WidgetChart({ config, data }: WidgetProps) {
                   vertical={false}
                 />
                 <XAxis
-                  dataKey={xAxisKey}
+                  dataKey="date"
                   tick={{ fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
@@ -233,13 +228,9 @@ export default function WidgetChart({ config, data }: WidgetProps) {
                   tick={{ fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={
-                    valueFormat === "currency"
-                      ? (v: number) => formatCurrency(v)
-                      : undefined
-                  }
+                  tickFormatter={(v: number) => formatCurrency(v)}
                 />
-                <Tooltip content={<ChartTooltip valueFormat={valueFormat} />} />
+                <Tooltip content={<ChartTooltip valueFormat="currency" />} />
                 {series ? (
                   series.map((s, i) => (
                     <Area
@@ -276,7 +267,7 @@ export default function WidgetChart({ config, data }: WidgetProps) {
                   vertical={false}
                 />
                 <XAxis
-                  dataKey={xAxisKey}
+                  dataKey="date"
                   tick={{ fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
@@ -285,13 +276,9 @@ export default function WidgetChart({ config, data }: WidgetProps) {
                   tick={{ fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={
-                    valueFormat === "currency"
-                      ? (v: number) => formatCurrency(v)
-                      : undefined
-                  }
+                  tickFormatter={(v: number) => formatCurrency(v)}
                 />
-                <Tooltip content={<ChartTooltip valueFormat={valueFormat} />} />
+                <Tooltip content={<ChartTooltip valueFormat="currency" />} />
                 {series ? (
                   series.map((s, i) => (
                     <Line
@@ -318,6 +305,14 @@ export default function WidgetChart({ config, data }: WidgetProps) {
               </LineChart>
             )}
           </ResponsiveContainer>
+          {isDonut && (
+            <div className="flex flex-col items-center pointer-events-none [grid-area:1/1]">
+              <span className="text-xs text-muted-foreground">Total</span>
+              <span className="text-base font-bold tabular-nums tracking-display">
+                {formatCurrency((data as any)?.value)}
+              </span>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
