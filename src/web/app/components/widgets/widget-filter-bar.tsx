@@ -1,5 +1,5 @@
-// Widget: filter-bar -- date range, category, and direction filters
-import { useCallback, useState, type ChangeEvent } from "react";
+// Widget: filter-bar -- date range, category, merchant, account, and direction filters
+import { useEffect, useCallback, useState, type ChangeEvent } from "react";
 import { cn } from "@/lib/utils";
 import { getCurrentMonth } from "@/lib/format";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useProviders } from "@/hooks/use-providers";
+import { useCategoryList } from "@/hooks/use-categories";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import type { WidgetProps } from "./widget-registry.js";
 
 // Direction options for the toggle
@@ -22,42 +23,22 @@ const DIRECTION_OPTIONS = [
   { value: "income", label: "Income" },
 ];
 
-function FilterSkeleton() {
-  return (
-    <Card>
-      <CardContent className="pt-5">
-        <div className="flex flex-wrap gap-4">
-          <Skeleton className="h-9 w-36" />
-          <Skeleton className="h-9 w-36" />
-          <Skeleton className="h-9 w-36" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function WidgetFilterBar({ config, data, onFilterChange }: WidgetProps) {
-  // Categories can come from config (static) or data (dynamic)
-  const staticCategories = config.categories as string[] | undefined;
-  const categories = staticCategories || (Array.isArray(data) ? data : []);
-  const showDateRange = config.showDateRange !== false;
-  const showCategory = config.showCategory !== false;
-  const showDirection = config.showDirection !== false;
+  const filterFlags = config.filters as any
+  const showDateRange = filterFlags.includes("dateRange");
+  const showCategory = filterFlags.includes("category");
+  const showProvider = filterFlags.includes("provider");
+  const showDirection = filterFlags.includes("direction");
+  const { data: categories = [] } = useCategoryList(showCategory);
+  const { data: providers = [] } = useProviders(showProvider);
 
   // Default values
   const currentMonth = getCurrentMonth();
-  const [fromMonth, setFromMonth] = useState(
-    (config.defaultFrom as string) || currentMonth,
-  );
-  const [toMonth, setToMonth] = useState(
-    (config.defaultTo as string) || currentMonth,
-  );
-  const [category, setCategory] = useState<string>(
-    (config.defaultCategory as string) || "all",
-  );
-  const [direction, setDirection] = useState<string>(
-    (config.defaultDirection as string) || "all",
-  );
+  const [fromMonth, setFromMonth] = useState(currentMonth);
+  const [toMonth, setToMonth] = useState(currentMonth);
+  const [category, setCategory] = useState<string[]>([]);
+  const [provider, setProvider] = useState<string>("all");
+  const [direction, setDirection] = useState<string>("all");
 
   const emitChange = useCallback(
     (overrides: Record<string, unknown>) => {
@@ -66,12 +47,13 @@ export default function WidgetFilterBar({ config, data, onFilterChange }: Widget
         fromMonth,
         toMonth,
         category,
+        provider,
         direction,
         ...overrides,
       };
       onFilterChange(filters);
     },
-    [onFilterChange, fromMonth, toMonth, category, direction],
+    [onFilterChange, fromMonth, toMonth, category, provider, direction],
   );
 
   const handleFromChange = useCallback(
@@ -94,8 +76,16 @@ export default function WidgetFilterBar({ config, data, onFilterChange }: Widget
 
   const handleCategoryChange = useCallback(
     (val: string) => {
-      setCategory(val);
-      emitChange({ category: val });
+      setCategory([val]);
+      emitChange({ category: [val] });
+    },
+    [emitChange],
+  );
+
+  const handleProviderChange = useCallback(
+    (val: string) => {
+      setProvider(val);
+      emitChange({ merchant: val === "all" ? undefined : [val] });
     },
     [emitChange],
   );
@@ -107,11 +97,6 @@ export default function WidgetFilterBar({ config, data, onFilterChange }: Widget
     },
     [emitChange],
   );
-
-  // Show skeleton only when expecting dynamic categories and none arrived
-  if (data === undefined && !staticCategories && showCategory) {
-    return <FilterSkeleton />;
-  }
 
   return (
     <Card>
@@ -145,15 +130,35 @@ export default function WidgetFilterBar({ config, data, onFilterChange }: Widget
           {showCategory && (
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Category</Label>
-              <Select value={category} onValueChange={handleCategoryChange}>
+              <Select value={category[0]} onValueChange={handleCategoryChange}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All categories</SelectItem>
-                  {(categories as string[]).map((cat) => (
+                  {categories.map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Provider dropdown */}
+          {showProvider && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Provider</Label>
+              <Select value={provider} onValueChange={handleProviderChange}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="All providers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All providers</SelectItem>
+                  {providers.map((p) => (
+                    <SelectItem key={p.companyId} value={p.companyId}>
+                      {p.displayName}
                     </SelectItem>
                   ))}
                 </SelectContent>

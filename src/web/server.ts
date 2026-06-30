@@ -29,6 +29,10 @@ import {
   createTranslationRule, deleteTranslationRule, applyTranslationRules,
   updateTranslationByDescription,
 } from "../db/repositories/translations.js";
+import { validatePage } from "../core/page-schema.js"
+import {
+  listCustomPages, getCustomPage, createCustomPage, updateCustomPage, deleteCustomPage,
+} from "../db/repositories/custom-pages.js";
 import {
   listTransactions, updateTransactionCategory, countTransactions,
 } from "../db/repositories/transactions.js";
@@ -44,6 +48,7 @@ import {
   registerSchedule, unregisterSchedule, checkScheduleRegistered, currentPlatform,
 } from "../core/scheduler/index.js";
 import { fetchAndApplyRules } from "../services/sync.js";
+import { executeQueryBatch } from "../services/query.js";
 import { getSpending } from "../services/spending.js";
 import { getIncome } from "../services/income.js";
 import {
@@ -59,6 +64,9 @@ import {
     getLatestCompletedSyncLog
 } from "../db/repositories/sync-log.js";
 import { parseMonthToRange } from "../shared/date-utils.js";
+import { EventEmitter } from "node:events";
+
+const pageEvents = new EventEmitter();
 
 
 function firstQueryValue(value: unknown): string | undefined {
@@ -112,6 +120,7 @@ function upsertTranslationRule(englishName: string, matchPattern: string) {
 
 export function startDashboard(port: number) {
   const app = express();
+  const authDisabled = process.env.KOLSHEK_DISABLE_AUTH === "1";
   const sessionToken = randomBytes(32).toString("hex");
   const cookieName = "kolshek_session";
 
@@ -121,6 +130,8 @@ export function startDashboard(port: number) {
 
   // Auth Middleware
   app.use((req, res, next) => {
+    if (authDisabled)
+      return next();
     if (req.query.token === sessionToken || req.cookies[cookieName] === sessionToken) {
       if (req.query.token) res.cookie(cookieName, sessionToken, { httpOnly: true, sameSite: 'strict' });
       return next();
@@ -183,14 +194,26 @@ export function startDashboard(port: number) {
     });
 
     currentSyncAbort = controller;
-    const { providers: providerIds, visible } = req.body;
+    const {
+      providers: providerIds,
+      visible,
+      from,
+      to,
+      force,
+      type,
+      stealth,
+    } = req.body;
 
     try {
       const allProviders = listProviders();
       const ids = providerIds ? (Array.isArray(providerIds) ? providerIds : [providerIds]) : null;
-      const targetProviders = ids
+      let targetProviders = ids
         ? allProviders.filter((p: any) => ids.map(String).includes(String(p.id)))
         : allProviders;
+
+      if (type) {
+        targetProviders = targetProviders.filter((p: any) => p.type === type);
+      }
 
       if (targetProviders.length === 0) {
         sendEvent({ type: "error", error: "No providers selected or found" });
@@ -206,6 +229,10 @@ export function startDashboard(port: number) {
       await setTimeout(100);
       const syncResult = await fetchAndApplyRules(targetProviders, {
         visible: !!visible,
+        fromDate: from ? new Date(from) : undefined,
+        toDate: to ? new Date(to) : undefined,
+        force: !!force,
+        stealth: !!stealth,
         signal: controller.signal,
         onProgress: (alias, stage) => {
           sendEvent({ type: "progress", provider: alias, stage });
@@ -361,7 +388,6 @@ export function startDashboard(port: number) {
 
       sendEvent({ type: "done" });
     } catch (err: any) {
-      console.error(`[SSE-GET] Error during fetchAndApplyRules:`, err);
       if (err.name === "AbortError") {
         sendEvent({ type: "error", error: "Sync cancelled" });
       } else {
@@ -685,11 +711,74 @@ export function startDashboard(port: number) {
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
 
+    const onPageChanged = (id: string) => {
+      res.write(`data: ${JSON.stringify({ type: "page_changed", id })}\n\n`);
+    };
+
+    const onPageDeleted = (id: string) => {
+      res.write(`data: ${JSON.stringify({ type: "page_deleted", id })}\n\n`);
+    };
+
+    pageEvents.on("changed", onPageChanged);
+    pageEvents.on("deleted", onPageDeleted);
+
     const timer = setInterval(() => {
       res.write("data: ping\n\n");
     }, 30000);
 
-    res.on("close", () => clearInterval(timer));
+    res.on("close", () => {
+      clearInterval(timer);
+      pageEvents.off("changed", onPageChanged);
+      pageEvents.off("deleted", onPageDeleted);
+    });
+  });
+
+  app.get("/api/v2/pages", (_req, res) => {
+    res.json({ success: true, data: listCustomPages() });
+  });
+
+  app.get("/api/v2/pages/:id", (req, res) => {
+    const page = getCustomPage(req.params.id);
+    if (!page) {
+      return res.status(404).json({ success: false, error: "Page not found" });
+    }
+    res.json({ success: true, data: page });
+  });
+
+  app.post("/api/v2/pages", (req, res) => {
+    const verify = validatePage(req.body)
+    if (!verify.success)
+      return res.status(400).json(verify)
+    const created = createCustomPage(req.body);
+    pageEvents.emit("changed", created.id);
+    res.json({ success: true, data: created });
+  });
+
+  app.put("/api/v2/pages/:id", (req, res) => {
+    const updated = updateCustomPage(req.params.id, req.body);
+    if (!updated) {
+      return res.status(404).json({ success: false, error: "Page not found" });
+    }
+    pageEvents.emit("changed", updated.id);
+    res.json({ success: true, data: updated });
+  });
+
+  app.delete("/api/v2/pages/:id", (req, res) => {
+    const deleted = deleteCustomPage(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: "Page not found" });
+    }
+    pageEvents.emit("deleted", req.params.id);
+    res.json({ success: true });
+  });
+
+  app.post("/api/v2/query", (req, res) => {
+    const { queries } = req.body;
+    if (!Array.isArray(queries)) {
+      return res.status(400).json({ success: false, error: "Invalid queries format" });
+    }
+    const results = executeQueryBatch(queries);
+    res.json({ success: true, data: results });
   });
 
   // Categories
@@ -799,10 +888,6 @@ export function startDashboard(port: number) {
       dryRun,
     });
     res.json({ success: true, data: result });
-  });
-
-  app.post("/api/v2/categories/rules/apply", (_req, res) => {
-    res.json({ success: true, data: applyCategoryRules() });
   });
 
   app.get("/api/v2/categories/classifications", (_req, res) => {

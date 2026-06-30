@@ -11,18 +11,6 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { WidgetProps } from "./widget-registry.js";
 
-// Resolve a value from data by key path
-function resolvePath(obj: unknown, path: string): unknown {
-  if (obj == null || !path) return undefined;
-  const parts = path.split(".");
-  let current: any = obj;
-  for (const part of parts) {
-    if (current == null) return undefined;
-    current = current[part];
-  }
-  return current;
-}
-
 function ProgressSkeleton() {
   return (
     <Card>
@@ -39,12 +27,8 @@ function ProgressSkeleton() {
 
 export default function WidgetProgressBar({ config, data }: WidgetProps) {
   const title = (config.title as string) || "Progress";
-  const currentKey = config.currentKey as string | undefined;
-  const targetKey = config.targetKey as string | undefined;
-  // Allow static target value in config
-  const staticTarget = config.target as number | undefined;
+  const target = (config.target as number) || 100;
   const format = (config.format as string) || "currency";
-  const currency = config.currency as string | undefined;
 
   // Loading state
   if (data === undefined) {
@@ -52,18 +36,13 @@ export default function WidgetProgressBar({ config, data }: WidgetProps) {
   }
 
   // Resolve current and target values
-  const rawCurrent = currentKey ? resolvePath(data, currentKey) : data;
-  const currentValue = typeof rawCurrent === "number" ? rawCurrent : Number(rawCurrent);
-
-  const rawTarget = targetKey ? resolvePath(data, targetKey) : staticTarget;
-  const targetValue = typeof rawTarget === "number" ? rawTarget : Number(rawTarget);
-
+  const currentValue = Number((data as any).value ?? undefined);
   const isValidCurrent = !Number.isNaN(currentValue);
-  const isValidTarget = !Number.isNaN(targetValue) && targetValue > 0;
+  const isValidTarget = !Number.isNaN(target) && target > 0;
 
   // Calculate percentage (cap display at 100% for progress bar, but show real % in text)
   const percentage = isValidCurrent && isValidTarget
-    ? (currentValue / targetValue) * 100
+    ? (currentValue / target) * 100
     : 0;
   const clampedPercentage = Math.min(percentage, 100);
 
@@ -84,7 +63,7 @@ export default function WidgetProgressBar({ config, data }: WidgetProps) {
 
   // Format display values
   function formatVal(val: number): string {
-    if (format === "currency") return formatCurrency(val, currency || "ILS");
+    if (format === "currency") return formatCurrency(val);
     if (format === "percent") return `${val.toFixed(1)}%`;
     return val.toLocaleString();
   }
@@ -108,7 +87,7 @@ export default function WidgetProgressBar({ config, data }: WidgetProps) {
               <>
                 {" / "}
                 <span className="font-medium text-foreground">
-                  {formatVal(targetValue)}
+                  {formatVal(target)}
                 </span>
               </>
             )}

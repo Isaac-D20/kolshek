@@ -10,22 +10,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type { WidgetProps } from "./widget-registry.js";
 
-// Resolve a value from data by key path
-function resolvePath(obj: unknown, path: string): unknown {
-  if (obj == null || !path) return undefined;
-  const parts = path.split(".");
-  let current: any = obj;
-  for (const part of parts) {
-    if (current == null) return undefined;
-    current = current[part];
-  }
-  return current;
-}
-
-function formatValue(value: number, format?: string, currency?: string): string {
+function formatValue(value: number, format?: string): string {
   switch (format) {
     case "currency":
-      return formatCurrency(value, currency || "ILS");
+      return formatCurrency(value);
     case "percent":
       return `${value.toFixed(1)}%`;
     case "integer":
@@ -60,12 +48,9 @@ function ComparisonSkeleton() {
 
 export default function WidgetComparison({ config, data }: WidgetProps) {
   const title = config.title as string | undefined;
-  const leftKey = config.leftKey as string | undefined;
-  const rightKey = config.rightKey as string | undefined;
-  const leftLabel = (config.leftLabel as string) || "Current";
-  const rightLabel = (config.rightLabel as string) || "Previous";
+  const leftLabel = ((config.labels as string[])?.at(0)) || "Current";
+  const rightLabel = ((config.labels as string[])?.at(1)) || "Previous";
   const format = config.format as string | undefined;
-  const currency = config.currency as string | undefined;
   // "higher_is_better" controls which direction is green vs red
   const higherIsBetter = config.higherIsBetter !== false;
 
@@ -75,10 +60,8 @@ export default function WidgetComparison({ config, data }: WidgetProps) {
   }
 
   // Resolve values
-  const rawLeft = leftKey ? resolvePath(data, leftKey) : undefined;
-  const rawRight = rightKey ? resolvePath(data, rightKey) : undefined;
-  const leftValue = typeof rawLeft === "number" ? rawLeft : Number(rawLeft);
-  const rightValue = typeof rawRight === "number" ? rawRight : Number(rawRight);
+  const leftValue = Number((data as any)[0]?.value);
+  const rightValue = Number((data as any)[1]?.value);
   const leftValid = !Number.isNaN(leftValue);
   const rightValid = !Number.isNaN(rightValue);
 
@@ -109,7 +92,7 @@ export default function WidgetComparison({ config, data }: WidgetProps) {
           <div className="flex-1 min-w-0">
             <p className="text-xs text-muted-foreground truncate">{leftLabel}</p>
             <p className="mt-1 text-xl font-bold tabular-nums tracking-tight truncate">
-              {leftValid ? formatValue(leftValue, format, currency) : "--"}
+              {leftValid ? formatValue(leftValue, format) : "--"}
             </p>
           </div>
 
@@ -155,7 +138,7 @@ export default function WidgetComparison({ config, data }: WidgetProps) {
           <div className="flex-1 min-w-0 text-right">
             <p className="text-xs text-muted-foreground truncate">{rightLabel}</p>
             <p className="mt-1 text-xl font-bold tabular-nums tracking-tight truncate">
-              {rightValid ? formatValue(rightValue, format, currency) : "--"}
+              {rightValid ? formatValue(rightValue, format) : "--"}
             </p>
           </div>
         </div>
@@ -173,7 +156,7 @@ export default function WidgetComparison({ config, data }: WidgetProps) {
               )}
             >
               {isPositive ? "+" : ""}
-              {formatValue(absDiff, format, currency)}
+              {formatValue(absDiff, format)}
             </span>
           </p>
         )}

@@ -1,45 +1,36 @@
 // Desktop sidebar navigation for the KolShek dashboard
-import { useCallback, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import {useCallback, useState} from "react";
+import {useLocation, useNavigate} from "react-router";
 import {
+  ArrowLeftRight,
+  Building2,
+  Clock,
+  FilePlus,
+  Languages,
   LayoutDashboard,
   Lightbulb,
-  ArrowLeftRight,
-  PieChart,
-  TrendingUp,
-  Tags,
-  Languages,
-  Upload,
-  Building2,
-
-  Clock,
-  Sun,
-  Moon,
   Monitor,
+  Moon,
+  PieChart,
   RefreshCw,
+  Sun,
+  Tags,
+  TrendingUp,
+  Upload,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useTheme } from "@/hooks/use-theme";
-import { useSync } from "@/hooks/use-sync";
-import { useNavBadges } from "@/hooks/use-nav-badges";
-import { formatRelativeTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
-import { SyncPanel } from "./sync-panel";
-import { useCustomPages, usePageEvents } from "@/hooks/use-custom-pages";
-import { getIcon } from "@/lib/icon-map";
+import {Button} from "@/components/ui/button";
+import {Badge} from "@/components/ui/badge";
+import {ScrollArea} from "@/components/ui/scroll-area";
+import {Tooltip, TooltipContent, TooltipTrigger,} from "@/components/ui/tooltip";
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,} from "@/components/ui/dropdown-menu";
+import {useTheme} from "@/hooks/use-theme";
+import {useSync} from "@/hooks/use-sync";
+import {useNavBadges} from "@/hooks/use-nav-badges";
+import {formatRelativeTime} from "@/lib/format";
+import {cn} from "@/lib/utils";
+import {SyncPanel} from "./sync-panel";
+import {useCustomPages, usePageEvents} from "@/hooks/use-custom-pages";
+import {getIcon} from "@/lib/icon-map";
 
 // Navigation item definition
 interface NavItem {
@@ -130,18 +121,21 @@ export function Sidebar() {
       ],
     },
     // Dynamic custom pages section
-    ...(customPages && customPages.length > 0
-      ? [
-          {
-            title: "My Pages",
-            items: customPages.map((page) => ({
-              label: page.title,
-              path: `/pages/${page.id}`,
-              icon: getIcon(page.icon),
-            })),
-          },
-        ]
-      : []),
+    {
+      title: "My Pages",
+      items: [
+        ...(customPages || []).map((page) => ({
+          label: page.title,
+          path: `/pages/${page.id}`,
+          icon: getIcon(page.icon),
+        })),
+        {
+          label: "Create Page",
+          path: "/pages/new",
+          icon: FilePlus,
+        },
+      ],
+    },
   ];
 
   const isActive = useCallback(
@@ -168,9 +162,7 @@ export function Sidebar() {
     setSyncPanelOpen(true);
   }, [isRunning, start]);
 
-  const themeIcon =
-    theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
-  const ThemeIcon = themeIcon;
+  const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
 
   return (
     <>

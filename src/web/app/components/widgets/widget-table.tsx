@@ -87,14 +87,21 @@ function TableSkeleton({ columns }: { columns: number }) {
 
 export default function WidgetTable({ config, data }: WidgetProps) {
   const title = config.title as string | undefined;
-  const columns = (config.columns as ColumnDef[]) || [];
+  const columns = (config.columns as ColumnDef[]) || [
+    { key: "date", label: "Date", format: "fullDate", align: "left" },
+    { key: "description", label: "Description", align: "center" },
+    { key: "chargedAmount", label: "Amount", format: "currency", align: "center" },
+    { key: "category", label: "Category", align: "center" },
+    { key: "provider", label: "Provider", align: "center" },
+    { key: "account", label: "Account", align: "center" },
+  ];
 
   // Loading state
   if (data === undefined) {
     return <TableSkeleton columns={Math.max(columns.length, 3)} />;
   }
 
-  const rows = Array.isArray(data) ? data : [];
+  const rows = Array.isArray((data as any).rows) ? (data as any).rows : [];
 
   return (
     <Card>

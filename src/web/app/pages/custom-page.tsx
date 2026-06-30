@@ -1,18 +1,47 @@
 // Custom page view -- renders a user-defined dashboard page by its ID
 import { useParams } from "react-router";
-import { FileQuestion } from "lucide-react";
-import { useCustomPage } from "@/hooks/use-custom-pages";
+import { FileQuestion, RefreshCw, Trash2 } from "lucide-react";
+import { useCustomPage, useDeletePage } from "@/hooks/use-custom-pages";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CustomPageRenderer } from "@/components/custom-page/custom-page-renderer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { useSync } from "@/hooks/use-sync";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 export default function CustomPage() {
   const { pageId } = useParams<{ pageId: string }>();
   const { data: page, isLoading, isError, error } = useCustomPage(pageId ?? "");
+  const deletePage = useDeletePage();
+  const { start, isRunning } = useSync();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useDocumentTitle(page?.title ?? "Custom Page");
+
+  const handleSync = () => {
+    // If the page definition mentions specific providers or accounts, we could be smart.
+    // For now, we'll just open the sync panel.
+    start();
+  };
+
+  const handleUpdate = async () => {
+    if (!page) return;
+  }
+
+  const handleDelete = async () => {
+    if (!page || !window.confirm(`Are you sure you want to delete the page "${page.title}"?`)) return;
+    setIsDeleting(true);
+    try {
+      await deletePage.mutateAsync(page.id);
+      window.location.href = "/";
+    } catch (err) {
+      alert("Failed to delete page");
+      setIsDeleting(false);
+    }
+  };
 
   // Loading state
   if (isLoading) {
@@ -66,7 +95,22 @@ export default function CustomPage() {
       <PageHeader
         title={page.title}
         description={page.description ?? undefined}
-      />
+      >
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleSync} disabled={isRunning}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", isRunning && "animate-spin")} />
+            Sync
+          </Button>
+          <Button variant="outline" size="sm">
+            <FileQuestion className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete} disabled={isDeleting}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
+        </div>
+      </PageHeader>
       <CustomPageRenderer pageId={page.id} definition={page.definition} />
     </div>
   );

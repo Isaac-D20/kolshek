@@ -27,7 +27,7 @@ export default function WidgetText({ config, data }: WidgetProps) {
   // Content can come from config (static) or data (dynamic)
   const staticContent = config.content as string | undefined;
   const size = (config.size as string) || "base";
-  const wrapped = config.card !== false; // Default: wrapped in Card
+  const wrapped = config.wrapped !== false; // Default: wrapped in Card
 
   // Loading state -- only when we expect dynamic data
   if (data === undefined && !staticContent) {

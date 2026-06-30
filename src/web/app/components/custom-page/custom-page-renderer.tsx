@@ -13,7 +13,7 @@ interface CustomPageRendererProps {
 }
 
 // Walk the widget tree and collect all queries with path-based keys
-function collectQueries(widget: Record<string, unknown>, prefix: string = "w"): BatchQuery[] {
+function collectQueries(widget: Record<string, unknown>, prefix: string = "w_0"): BatchQuery[] {
   const queries: BatchQuery[] = [];
   if (widget.query) {
     queries.push({ key: prefix, query: widget.query as Record<string, unknown> });
@@ -45,11 +45,10 @@ function collectQueries(widget: Record<string, unknown>, prefix: string = "w"): 
 // Inner component that lives inside FilterProvider so it can read filter context
 function RendererInner({ pageId, definition }: CustomPageRendererProps) {
   const { filters, setFilters } = usePageFilters();
-
   // Collect every query from the full widget tree
   const allQueries = useMemo(() => {
-    if (!definition.widget) return [];
-    return collectQueries(definition.widget as Record<string, unknown>);
+    if (!definition) return [];
+    return collectQueries(definition as Record<string, unknown>);
   }, [definition]);
 
   // Coerce FilterState into the generic record shape the batch hook expects
@@ -57,8 +56,7 @@ function RendererInner({ pageId, definition }: CustomPageRendererProps) {
     () => (Object.keys(filters).length > 0 ? (filters as Record<string, unknown>) : undefined),
     [filters],
   );
-
-  const { data: batchResults, isLoading } = useWidgetQueries(pageId, allQueries, filterRecord);
+  const { data: batchResults } = useWidgetQueries(pageId, allQueries, filterRecord);
 
   // Handle filter changes from filter-bar widgets
   const handleFilterChange = useCallback(
@@ -74,18 +72,17 @@ function RendererInner({ pageId, definition }: CustomPageRendererProps) {
       const widgetType = widget.type as string | undefined;
       if (!widgetType) return null;
 
+      const currentPrefix = `${prefix}_${index}`;
       const entry = WIDGET_REGISTRY[widgetType];
       if (!entry) {
         return (
-          <p key={`${prefix}_${index}`} className="text-xs text-muted-foreground italic py-2">
+          <p key={currentPrefix} className="text-xs text-muted-foreground italic py-2">
             Unknown widget: {widgetType}
           </p>
         );
       }
 
       const Component = entry.component;
-      const currentPrefix = prefix === "w" ? `w_${index}` : `${prefix}_${index}`;
-
       // Resolve data for this widget from batch results
       let resolvedData: unknown = undefined;
       if (widget.query && batchResults) {
@@ -104,6 +101,13 @@ function RendererInner({ pageId, definition }: CustomPageRendererProps) {
         });
         resolvedData = multiData;
       }
+      if ((resolvedData as any)?.error) {
+          return (
+              <p key={currentPrefix} className="text-xs text-red-500 italic py-2">
+                  Error: {(resolvedData as any).error}
+              </p>
+          )
+      }
 
       // Build props based on widget type
       const baseProps: WidgetProps = {
@@ -118,10 +122,9 @@ function RendererInner({ pageId, definition }: CustomPageRendererProps) {
 
       // Filter bar gets the change handler
       const isFilterBar = widgetType === "filter-bar";
-
       return (
         <Suspense
-          key={`${prefix}_${index}`}
+          key={currentPrefix}
           fallback={<Skeleton className="h-32 w-full rounded-lg" />}
         >
           <Component
@@ -135,23 +138,8 @@ function RendererInner({ pageId, definition }: CustomPageRendererProps) {
     [batchResults, handleFilterChange],
   );
 
-  // Loading skeleton for the full page
-  if (isLoading) {
-    return (
-      <div className="space-y-4 animate-pulse">
-        <Skeleton className="h-10 w-48 rounded-lg" />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-32 rounded-lg" />
-          <Skeleton className="h-32 rounded-lg" />
-          <Skeleton className="h-32 rounded-lg" />
-        </div>
-        <Skeleton className="h-64 rounded-lg" />
-      </div>
-    );
-  }
-
   // Render the root widget (or root children array)
-  const root = definition.widget as Record<string, unknown> | undefined;
+  const root = definition as Record<string, unknown> | undefined;
   if (!root) {
     return (
       <p className="text-sm text-muted-foreground py-4">

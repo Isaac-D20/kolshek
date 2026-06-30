@@ -54,7 +54,7 @@
     "debug": "^4.4.3",
     "env-paths": "^3.0.0",
     "express": "^4.21.2",
-    "israeli-bank-scrapers-core": "^6.7.5",
+    "israeli-bank-scrapers-core": "github:hadaromer/israeli-bank-scrapers#fix/one-zero-cloudflare-tls",
     "lucide-react": "^0.577.0",
     "ora": "^8.0.0",
     "puppeteer-core": "^24.0.0",
@@ -88,5 +88,13 @@
     "vite": "^8.0.0",
     "vitest": "^4.1.8"
   },
-  "trustedDependencies": []
+  "trustedDependencies": [],
+  "allowScripts": {
+    "@parcel/watcher@2.5.6": true,
+    "@swc/core@1.15.40": true,
+    "better-sqlite3@12.10.0": true,
+    "esbuild@0.28.1": true,
+    "puppeteer@24.43.1": true,
+    "github:Isaac-D20/israeli-bank-scrapers#653ec6dd82084e5e6dfef1ed5fd44c9fdd38c790": true
+  }
 }

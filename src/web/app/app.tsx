@@ -17,6 +17,7 @@ const CategoriesPage = lazy(() => import("./pages/categories-page"));
 const TranslationsPage = lazy(() => import("./pages/translations-page"));
 const ProvidersPage = lazy(() => import("./pages/providers-page"));
 const CustomPage = lazy(() => import("./pages/custom-page"));
+const CreatePage = lazy(() => import("./pages/create-page"));
 const ImportPage = lazy(() => import("./pages/import-page"));
 const SchedulePage = lazy(() => import("./pages/schedule-page"));
 
@@ -65,6 +66,7 @@ export function App() {
                   <Route path="/categories" element={<CategoriesPage />} />
                   <Route path="/translations" element={<TranslationsPage />} />
                   <Route path="/providers" element={<ProvidersPage />} />
+                  <Route path="/pages/new" element={<CreatePage />} />
                   <Route path="/pages/:pageId" element={<CustomPage />} />
                   <Route path="/import" element={<ImportPage />} />
                   <Route path="/schedule" element={<SchedulePage />} />

@@ -65,7 +65,7 @@ export function registerPageCommand(program: Command): void {
           title: p.title,
           icon: p.icon,
           description: p.description,
-          layout: p.definition,
+          definition: p.definition,
         }, null, 2));
       }
     });
@@ -124,7 +124,7 @@ export function registerPageCommand(program: Command): void {
           title: result.data.title,
           icon: result.data.icon,
           description: result.data.description,
-          definition: result.data.layout as Record<string, unknown>,
+          definition: result.data.definition as Record<string, unknown>,
         });
         if (isJsonMode()) {
           printJson(jsonSuccess(created));

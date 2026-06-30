@@ -4,10 +4,11 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { ProviderCard } from "@/types/api";
 
-export function useProviders() {
+export function useProviders(enabled = true) {
   return useQuery({
     queryKey: queryKeys.providers.list(),
     queryFn: () => api.get<ProviderCard[]>("/api/v2/providers"),
+    enabled: enabled
   });
 }
 
