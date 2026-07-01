@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { Save, Layout, Type, Info, FileCode, BookOpen, Sparkles } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { PageHeader } from "@/components/shared/page-header";
@@ -13,9 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreatePage } from "@/hooks/use-custom-pages";
+import { useCreatePage, useUpdatePage } from "@/hooks/use-custom-pages";
 import { WidgetReference } from "@/components/custom-page/widget-reference";
 import { validatePage } from "../../../core/page-schema";
+import { ICON_MAP } from "@/lib/icon-map";
 
 const TEMPLATES = [
   {
@@ -92,28 +93,35 @@ const TEMPLATES = [
 ];
 
 export default function CreatePage() {
-  useDocumentTitle("Create Custom Page");
+  const location = useLocation();
+  const editingPage = (location.state as any)?.editingPage;
+  const isEditing = !!editingPage;
+
+  useDocumentTitle(isEditing ? "Edit Custom Page" : "Create Custom Page");
   const navigate = useNavigate();
   const createPage = useCreatePage();
+  const updatePage = useUpdatePage();
 
   const [form, setForm] = useState({
-    id: "",
-    title: "",
-    icon: "layout-dashboard",
-    description: "",
-    definition: JSON.stringify({
-      type: "stack",
-        children: [
-          {
-            type: "metric-card",
-            query: {
-              type: "aggregate",
-              metric: "sum",
-              filters: { period: "30d" }
+    id: editingPage?.id ?? "",
+    title: editingPage?.title ?? "",
+    icon: editingPage?.icon ?? "layout-dashboard",
+    description: editingPage?.description ?? "",
+    definition: editingPage
+      ? JSON.stringify(editingPage.definition, null, 2)
+      : JSON.stringify({
+          type: "stack",
+          children: [
+            {
+              type: "metric-card",
+              query: {
+                type: "aggregate",
+                metric: "sum",
+                filters: { period: "30d" }
+              }
             }
-          }
-        ]
-    }, null, 2)
+          ]
+        }, null, 2)
   });
 
   const [error, setError] = useState<string | null>(null);
@@ -135,16 +143,22 @@ export default function CreatePage() {
       definition: JSON.parse(form.definition)
     });
     if (!response.success) {
-      setError(response.error || "Failed to create page");
+      setError(response.error || "Failed to save page");
       return;
     }
 
     try {
-      // @ts-ignore
-      await createPage.mutateAsync(response.data);
-      navigate(`/pages/${form.id}`);
+      if (isEditing) {
+        // @ts-ignore
+        await updatePage.mutateAsync(response.data);
+        navigate(`/pages/${form.id}`);
+      } else {
+        // @ts-ignore
+        await createPage.mutateAsync(response.data);
+        navigate(`/pages/${form.id}`);
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to create page");
+      setError(err.message || "Failed to save page");
     }
   };
 
@@ -162,24 +176,26 @@ export default function CreatePage() {
     <div className="space-y-6 h-full flex flex-col">
       <div className="flex items-center justify-between">
         <PageHeader
-          title="Create Custom Page"
-          description="Define a new dashboard page using JSON widgets."
+          title={isEditing ? "Edit Custom Page" : "Create Custom Page"}
+          description={isEditing ? "Update your dashboard page definition." : "Define a new dashboard page using JSON widgets."}
         />
-        <div className="flex items-center gap-3">
-          <Label htmlFor="template" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Sparkles className="h-3 w-3" /> Quick Template
-          </Label>
-          <Select onValueChange={handleTemplateSelect}>
-            <SelectTrigger id="template" className="w-[180px] h-8 text-xs">
-              <SelectValue placeholder="Select template..." />
-            </SelectTrigger>
-            <SelectContent>
-              {TEMPLATES.map(t => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {!isEditing && (
+          <div className="flex items-center gap-3">
+            <Label htmlFor="template" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3" /> Quick Template
+            </Label>
+            <Select onValueChange={handleTemplateSelect}>
+              <SelectTrigger id="template" className="w-[180px] h-8 text-xs">
+                <SelectValue placeholder="Select template..." />
+              </SelectTrigger>
+              <SelectContent>
+                {TEMPLATES.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
@@ -200,6 +216,7 @@ export default function CreatePage() {
                 placeholder="my-custom-page"
                 value={form.id}
                 onChange={(e) => setForm({ ...form, id: e.target.value })}
+                disabled={isEditing}
               />
             </div>
             <div className="space-y-2">
@@ -217,13 +234,19 @@ export default function CreatePage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="icon" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Icon Name</Label>
-              <Input
-                id="icon"
-                placeholder="layout-dashboard, pie-chart, trending-up..."
-                value={form.icon}
-                onChange={(e) => setForm({ ...form, icon: e.target.value })}
-              />
+              <Label htmlFor="icon" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Icon</Label>
+              <Select value={form.icon} onValueChange={(value) => setForm({ ...form, icon: value })}>
+                <SelectTrigger id="icon">
+                  <SelectValue placeholder="Select an icon..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(ICON_MAP).map((iconName) => (
+                    <SelectItem key={iconName} value={iconName}>
+                      {iconName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="description" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -253,13 +276,13 @@ export default function CreatePage() {
             <Button type="button" variant="outline" onClick={() => navigate(-1)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createPage.isPending}>
-              {createPage.isPending ? (
-                "Creating..."
+            <Button type="submit" disabled={createPage.isPending || updatePage.isPending}>
+              {createPage.isPending || updatePage.isPending ? (
+                isEditing ? "Updating..." : "Creating..."
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Create Page
+                  {isEditing ? "Update Page" : "Create Page"}
                 </>
               )}
             </Button>

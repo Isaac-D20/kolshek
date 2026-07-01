@@ -93,19 +93,57 @@ export async function launchBrowser(
     }
   }
 
+  // Determine initial headless flag. Default to true if not provided.
+  let headlessFlag = options?.headless ?? true;
+  if (headlessFlag && process.platform === "linux" && !process.env.DISPLAY) {
+    // No DISPLAY — cannot start headful Chrome. Log and fallback to headless.
+    // eslint-disable-next-line no-console
+    console.warn(
+      "Headful browser requested but no DISPLAY detected. Falling back to headless mode. To run headful in Docker, run with Xvfb or set DISPLAY."
+    );
+    headlessFlag = true;
+  }
+
   const launchOpts = {
     executablePath: chromePath,
-    headless: options?.headless ?? true,
+    headless: headlessFlag,
     args,
     env,
   };
 
-  if (options?.stealth) {
-    const stealth = puppeteerExtra.use(StealthPlugin());
-    return stealth.launch(launchOpts) as unknown as Browser;
-  }
+  // Helper to perform the actual launch (handles stealth plugin usage)
+  const doLaunch = async (opts: typeof launchOpts) => {
+    if (options?.stealth) {
+      const stealth = puppeteerExtra.use(StealthPlugin());
+      return stealth.launch(opts) as unknown as Browser;
+    }
+    return vanillaPuppeteer.launch(opts);
+  };
 
-  return vanillaPuppeteer.launch(launchOpts);
+  // Try launching. If the initial attempt fails and the user requested headful,
+  // attempt one retry in headless mode to provide a graceful fallback.
+  try {
+    return await doLaunch(launchOpts);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // If headful was explicitly requested, try fallback to headless once.
+    if (headlessFlag) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "Failed to launch headful browser:",
+        msg,
+        "— retrying in headless mode."
+      );
+      const fallbackOpts = { ...launchOpts, headless: true };
+      try {
+        return await doLaunch(fallbackOpts);
+      } catch (err2) {
+        // If fallback also fails, rethrow the original error for visibility.
+        throw err2;
+      }
+    }
+    throw err;
+  }
 }
 
 export async function closeBrowser(browser: Browser): Promise<void> {

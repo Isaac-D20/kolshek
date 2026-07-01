@@ -1,6 +1,7 @@
 // Custom page view -- renders a user-defined dashboard page by its ID
 import { useParams } from "react-router";
-import { FileQuestion, RefreshCw, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router";
+import { FileQuestion, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useCustomPage, useDeletePage } from "@/hooks/use-custom-pages";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { PageHeader } from "@/components/shared/page-header";
@@ -18,6 +19,7 @@ export default function CustomPage() {
   const deletePage = useDeletePage();
   const { start, isRunning } = useSync();
   const [isDeleting, setIsDeleting] = useState(false);
+  const navigate = useNavigate();
 
   useDocumentTitle(page?.title ?? "Custom Page");
 
@@ -27,9 +29,11 @@ export default function CustomPage() {
     start();
   };
 
-  const handleUpdate = async () => {
-    if (!page) return;
-  }
+  const handleEdit = () => {
+    if (page) {
+      navigate("/pages/new", { state: { editingPage: page } });
+    }
+  };
 
   const handleDelete = async () => {
     if (!page || !window.confirm(`Are you sure you want to delete the page "${page.title}"?`)) return;
@@ -101,8 +105,8 @@ export default function CustomPage() {
             <RefreshCw className={cn("mr-2 h-4 w-4", isRunning && "animate-spin")} />
             Sync
           </Button>
-          <Button variant="outline" size="sm">
-            <FileQuestion className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={handleEdit}>
+            <Pencil className="mr-2 h-4 w-4" />
             Edit
           </Button>
           <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete} disabled={isDeleting}>
