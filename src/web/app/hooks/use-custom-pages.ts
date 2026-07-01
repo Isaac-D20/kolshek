@@ -125,7 +125,7 @@ export function useCreatePage() {
 export function useUpdatePage() {
     const queryClient = useQueryClient();
     return useMutation({
-    mutationFn: (id: string) => api.put<CustomPageFull>(`/api/v2/pages/${id}`, page),
+    mutationFn: ({ id, ...page }: CreatePageInput & { id: string }) => api.put<CustomPageFull>(`/api/v2/pages/${id}`, page),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customPages.all });
     },

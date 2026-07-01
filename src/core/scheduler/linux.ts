@@ -43,17 +43,25 @@ WantedBy=timers.target
 }
 
 async function hasSystemd(): Promise<boolean> {
+  // Quick check: is systemctl present?
+  try {
+    await run(["which", "systemctl"]);
+  } catch {
+    return false;
+  }
+
+  // Ensure a user dbus runtime bus exists (common cause of 'Failed to connect to bus')
+  const runtimeDir = process.env.XDG_RUNTIME_DIR;
+  if (!runtimeDir) return false;
+  const busPath = join(runtimeDir, "bus");
+  if (!existsSync(busPath)) return false;
+
+  // Final check: systemctl --user should succeed (non-zero means not available)
   try {
     await run(["systemctl", "--user", "--no-pager", "status"]);
     return true;
   } catch {
-    // systemctl may exit non-zero but still be available
-    try {
-      await run(["which", "systemctl"]);
-      return true;
-    } catch {
-      return false;
-    }
+    return false;
   }
 }
 
@@ -128,25 +136,39 @@ const backend: SchedulerBackend = {
   async register(config: ScheduleConfig): Promise<void> {
     validateBinaryPath(config.binaryPath);
     if (await hasSystemd()) {
-      await systemdRegister(config);
-    } else {
-      await cronRegister(config);
+      try {
+        await systemdRegister(config);
+        return;
+      } catch (err) {
+        console.error("[Scheduler] systemd registration failed, falling back to crontab:", err);
+      }
     }
+    // Fallback to crontab; let errors propagate to caller
+    await cronRegister(config);
   },
 
   async unregister(): Promise<void> {
     if (await hasSystemd()) {
-      await systemdUnregister();
-    } else {
-      await cronUnregister();
+      try {
+        await systemdUnregister();
+        return;
+      } catch (err) {
+        console.error("[Scheduler] systemd unregister failed, falling back to crontab:", err);
+      }
     }
+    await cronUnregister();
   },
 
   async isRegistered(): Promise<boolean> {
-    if (await hasSystemd()) {
-      return systemdIsRegistered();
+    try {
+      if (await hasSystemd()) {
+        return systemdIsRegistered();
+      }
+      return cronIsRegistered();
+    } catch (err) {
+      console.error("[Scheduler] isRegistered check failed:", err);
+      return false;
     }
-    return cronIsRegistered();
   },
 };
 

@@ -1,5 +1,5 @@
 // Widget: filter-bar -- date range, category, merchant, account, and direction filters
-import { useEffect, useCallback, useState, type ChangeEvent } from "react";
+import { useCallback, useState, type ChangeEvent } from "react";
 import { cn } from "@/lib/utils";
 import { getCurrentMonth } from "@/lib/format";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ const DIRECTION_OPTIONS = [
   { value: "income", label: "Income" },
 ];
 
-export default function WidgetFilterBar({ config, data, onFilterChange }: WidgetProps) {
+export default function WidgetFilterBar({ config, onFilterChange }: WidgetProps) {
   const filterFlags = config.filters as any
   const showDateRange = filterFlags.includes("dateRange");
   const showCategory = filterFlags.includes("category");
@@ -43,15 +43,13 @@ export default function WidgetFilterBar({ config, data, onFilterChange }: Widget
   const emitChange = useCallback(
     (overrides: Record<string, unknown>) => {
       if (!onFilterChange) return;
-      const filters = {
-        fromMonth,
-        toMonth,
-        category,
-        provider,
-        direction,
+      onFilterChange({
+        period: `${fromMonth}/${toMonth}`,
+        category: category,
+        provider: provider,
+        direction: direction,
         ...overrides,
-      };
-      onFilterChange(filters);
+      });
     },
     [onFilterChange, fromMonth, toMonth, category, provider, direction],
   );
