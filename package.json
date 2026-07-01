@@ -90,10 +90,11 @@
   },
   "trustedDependencies": [],
   "allowScripts": {
-    "@parcel/watcher@2.5.6": true,
-    "@swc/core@1.15.40": true,
-    "better-sqlite3@12.10.0": true,
     "esbuild@0.28.1": true,
-    "puppeteer@24.43.1": true
+    "puppeteer@24.43.1": true,
+    "github:Isaac-D20/israeli-bank-scrapers#96c4f7b36ae96000f9cce4c913672081891494d9": true,
+    "@parcel/watcher@2.5.1": true,
+    "@swc/core@1.15.43": true,
+    "better-sqlite3@12.11.1": true
   }
 }
