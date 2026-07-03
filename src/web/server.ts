@@ -149,8 +149,17 @@ function setupSseStream(res: express.Response) {
   return { sendEvent, controller };
 }
 
+interface HandlerResult {
+  success: boolean;
+  statusCode: number;
+  data?: any;
+  errorCode?: string;
+  errorMessage?: string;
+  error?: any;
+}
+
 // Helper to handle external deposit providers
-function handleExternalDeposit(provider: any, credentials: any, body: any) {
+function handleExternalDeposit(provider: any, credentials: any, body: any): HandlerResult {
   const amtRaw = credentials?.amount ?? body?.amount;
   const dateRaw = credentials?.date ?? body?.date;
   const amount = typeof amtRaw === "string" ? Number(amtRaw) : Number(amtRaw ?? NaN);
@@ -200,7 +209,7 @@ function handleExternalDeposit(provider: any, credentials: any, body: any) {
   };
 }
 
-async function handleOneZeroOtp(provider: any, credentials: any, isCreation: boolean) {
+async function handleOneZeroOtp(provider: any, credentials: any, isCreation: boolean): Promise<HandlerResult | null> {
   if (!credentials.phoneNumber) {
     return {
       success: false,
@@ -236,7 +245,7 @@ async function handleOneZeroOtp(provider: any, credentials: any, isCreation: boo
         success: false,
         statusCode: 400,
         errorCode: "OTP_TRIGGER_FAILED",
-        errorMessage: err instanceof Error ? err.message : "Failed to start OTP authentication",
+        errorMessage: (err instanceof Error ? err.message : "Failed to start OTP authentication") || "Unknown OTP error",
         error: err,
       };
     }
@@ -588,7 +597,7 @@ export function startDashboard(port: number) {
       if (provider.companyId === "external_deposit") {
         const result = handleExternalDeposit(provider, credentials, req.body);
         if (!result.success) {
-          return sendErrorResponse(res, result.statusCode, result.errorCode, result.errorMessage);
+          return sendErrorResponse(res, result.statusCode, result.errorCode!, result.errorMessage!);
         }
         return res.status(result.statusCode).json({ success: true, data: result.data });
       }
@@ -601,7 +610,7 @@ export function startDashboard(port: number) {
           const otpResult = await handleOneZeroOtp(provider, credentials, true);
           if (otpResult) {
             if (!otpResult.success) {
-              return sendErrorResponse(res, otpResult.statusCode, otpResult.errorCode, otpResult.errorMessage, otpResult.error);
+              return sendErrorResponse(res, otpResult.statusCode, otpResult.errorCode!, otpResult.errorMessage!, otpResult.error);
             }
             return res.status(otpResult.statusCode).json({ success: true, data: otpResult.data });
           }
@@ -683,7 +692,7 @@ export function startDashboard(port: number) {
       if (provider.companyId === "external_deposit") {
         const result = handleExternalDeposit(provider, credentials, req.body);
         if (!result.success) {
-          return sendErrorResponse(res, result.statusCode, result.errorCode, result.errorMessage);
+          return sendErrorResponse(res, result.statusCode, result.errorCode!, result.errorMessage!);
         }
         return res.status(result.statusCode).json({ success: true, data: result.data });
       }
@@ -692,7 +701,7 @@ export function startDashboard(port: number) {
         const otpResult = await handleOneZeroOtp(provider, credentials, false);
         if (otpResult) {
           if (!otpResult.success) {
-            return sendErrorResponse(res, otpResult.statusCode, otpResult.errorCode, otpResult.errorMessage, otpResult.error);
+            return sendErrorResponse(res, otpResult.statusCode, otpResult.errorCode!, otpResult.errorMessage!, otpResult.error);
           }
           return res.status(otpResult.statusCode).json({ success: true, data: otpResult.data });
         }
