@@ -120,6 +120,151 @@ function upsertTranslationRule(englishName: string, matchPattern: string) {
   return { rule: createTranslationRule(englishName, matchPattern), created: true };
 }
 
+// Helper to set up SSE headers and provide an event sending function
+function setupSseStream(res: express.Response) {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  const sendEvent = (event: any) => {
+    try {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+      // @ts-ignore
+      if (typeof res.flush === "function") {
+        // @ts-ignore
+        res.flush();
+      } else if (res.socket) {
+        // Force flush for Express without compression
+        // @ts-ignore
+        res.socket.setNoDelay?.(true);
+      }
+    } catch (e) {
+      console.error(`[SSE] Error sending event:`, e);
+    }
+  };
+
+  const controller = new AbortController();
+  return { sendEvent, controller };
+}
+
+interface HandlerResult {
+  success: boolean;
+  statusCode: number;
+  data?: any;
+  errorCode?: string;
+  errorMessage?: string;
+  error?: any;
+}
+
+// Helper to handle external deposit providers
+function handleExternalDeposit(provider: any, credentials: any, body: any): HandlerResult {
+  const amtRaw = credentials?.amount ?? body?.amount;
+  const dateRaw = credentials?.date ?? body?.date;
+  const amount = typeof amtRaw === "string" ? Number(amtRaw) : Number(amtRaw ?? NaN);
+
+  if (!Number.isFinite(amount)) {
+    deleteProvider(provider.id);
+    return {
+      success: false,
+      statusCode: 400,
+      errorCode: "INVALID_AMOUNT",
+      errorMessage: "Invalid deposit amount",
+    };
+  }
+
+  const account = upsertAccount(provider.id, "external", provider.companyId, amount, "ILS");
+  const dateIso = dateRaw ? new Date(dateRaw).toISOString() : new Date().toISOString();
+  const desc = "External deposit";
+  const hash = transactionHash({ date: dateIso, chargedAmount: amount, description: desc }, provider.companyId, account.accountNumber);
+  const uniqueId = transactionUniqueId({ date: dateIso, chargedAmount: amount, description: desc }, provider.companyId, account.accountNumber);
+  upsertTransaction({
+    accountId: account.id,
+    type: "normal",
+    date: dateIso,
+    processedDate: dateIso,
+    originalAmount: amount,
+    originalCurrency: "ILS",
+    chargedAmount: amount,
+    chargedCurrency: "ILS",
+    description: desc,
+    status: "completed",
+    hash,
+    uniqueId,
+  });
+
+  return {
+    success: true,
+    statusCode: 200,
+    data: {
+      ...provider,
+      hasCredentials: false,
+      authStatus: "connected",
+      accounts: [account],
+      accountCount: 1,
+      transactionCount: 1,
+      requiresOtp: false,
+    },
+  };
+}
+
+async function handleOneZeroOtp(provider: any, credentials: any, isCreation: boolean): Promise<HandlerResult | null> {
+  if (!credentials.phoneNumber) {
+    return {
+      success: false,
+      statusCode: 400,
+      errorCode: "INVALID_CREDENTIALS",
+      errorMessage: "One Zero credentials require email, password, and phoneNumber",
+    };
+  }
+
+  if (parseTwoFactorAuthInput(credentials) && !credentials.otpLongTermToken) {
+    try {
+      const otpResult = await startTwoFactorAuth(provider.companyId, credentials.phoneNumber);
+      if (otpResult.success) {
+        return {
+          success: true,
+          statusCode: 200,
+          data: {
+            ...provider,
+            hasCredentials: false,
+            authStatus: "pending",
+            accounts: [],
+            accountCount: 0,
+            transactionCount: 0,
+            requiresOtp: true,
+          },
+        };
+      }
+    } catch (err) {
+      if (isCreation) {
+        deleteProvider(provider.id);
+      }
+      return {
+        success: false,
+        statusCode: 400,
+        errorCode: "OTP_TRIGGER_FAILED",
+        errorMessage: (err instanceof Error ? err.message : "Failed to start OTP authentication") || "Unknown OTP error",
+        error: err,
+      };
+    }
+  }
+  return null; // Indicates that OTP handling was not applicable or completed
+}
+
+// Helper to send consistent error responses
+function sendErrorResponse(res: express.Response, statusCode: number, code: string, message: string, error?: any) {
+  console.error(`[API Error] ${code}: ${message}`, error);
+  return res.status(statusCode).json({
+    success: false,
+    error: {
+      code,
+      message,
+    },
+  });
+}
+
 export function startDashboard(port: number) {
   const app = express();
   const authDisabled = process.env.KOLSHEK_DISABLE_AUTH === "1";
@@ -138,8 +283,8 @@ export function startDashboard(port: number) {
       if (req.query.token) res.cookie(cookieName, sessionToken, { httpOnly: true, sameSite: 'strict' });
       return next();
     }
-    if (req.path.startsWith("/api/")) return res.status(401).json({ success: false });
-    res.status(401).send("Unauthorized");
+    if (req.path.startsWith("/api/")) return sendErrorResponse(res, 401, "UNAUTHORIZED", "Unauthorized");
+    res.status(401).send("Unauthorized"); // This is for non-API routes, keep as is.
   });
 
   // Asset Routes
@@ -160,33 +305,10 @@ export function startDashboard(port: number) {
   // SSE over POST (current client)
   app.post("/api/v2/fetch", async (req, res) => {
     if (currentSyncAbort) {
-      return res.status(409).json({ success: false, error: "Sync already in progress" });
+      return sendErrorResponse(res, 409, "SYNC_IN_PROGRESS", "Sync already in progress");
     }
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no");
-    res.flushHeaders();
-
-    const sendEvent = (event: any) => {
-      try {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
-        // @ts-ignore
-        if (typeof res.flush === "function") {
-          // @ts-ignore
-          res.flush();
-        } else if (res.socket) {
-          // Force flush for Express without compression
-          // @ts-ignore
-          res.socket.setNoDelay?.(true);
-        }
-      } catch (e) {
-        console.error(`[SSE] Error sending event:`, e);
-      }
-    };
-
-    const controller = new AbortController();
+    const { sendEvent, controller } = setupSseStream(res);
 
     res.on("close", () => {
       if (currentSyncAbort === controller) {
@@ -285,38 +407,12 @@ export function startDashboard(port: number) {
   // Compatibility: SSE over GET for older clients using EventSource
   app.get("/api/v2/fetch/events", async (req, res) => {
     if (currentSyncAbort) {
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      res.setHeader("X-Accel-Buffering", "no");
-      res.flushHeaders();
-      res.write(`data: ${JSON.stringify({ type: "error", error: "Sync already in progress" })}\n\n`);
+      const { sendEvent } = setupSseStream(res); // Use sendEvent for consistency
+      sendEvent({ type: "error", error: "Sync already in progress" });
       return res.end();
     }
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no");
-    res.flushHeaders();
-
-    const sendEvent = (event: any) => {
-      try {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
-        // @ts-ignore
-        if (typeof res.flush === "function") {
-          // @ts-ignore
-          res.flush();
-        } else if (res.socket) {
-          // @ts-ignore
-          res.socket.setNoDelay?.(true);
-        }
-      } catch (e) {
-        console.error(`[SSE-GET] Error sending event:`, e);
-      }
-    };
-
-    const controller = new AbortController();
+    const { sendEvent, controller } = setupSseStream(res);
 
     res.on("close", () => {
       if (currentSyncAbort === controller) {
@@ -494,84 +590,34 @@ export function startDashboard(port: number) {
       const effectiveAlias = parseStringBody(alias) || parseStringBody(displayName) || companyId;
 
       if (getProviderByAlias(effectiveAlias)) {
-        return res.status(409).json({
-          success: false,
-          error: {
-            code: "ALIAS_EXISTS",
-            message: `A provider with alias "${effectiveAlias}" already exists`,
-          },
-        });
+        return sendErrorResponse(res, 409, "ALIAS_EXISTS", `A provider with alias "${effectiveAlias}" already exists`);
       }
 
       const provider = createProvider(companyId, displayName || companyId, type, effectiveAlias);
-      if (provider.companyId === "external_deposit") { // Accept amount/date via credentials for consistency with the UI
-        const amtRaw = credentials?.amount ?? req.body?. amount;
-        const dateRaw = credentials?.date ?? req.body?.date;
-        const amount = typeof amtRaw === "string"? Number(amtRaw) : Number (amtRaw ?? NaN);
-        if (!Number.isFinite (amount)) { // Clean up provider record
-            deleteProvider(provider.id);
-            return res.status(400).json({success: false,  error: { code: "INVALID_AMOUNT", message: "Invalid deposit amount" },  });
+      if (provider.companyId === "external_deposit") {
+        const result = handleExternalDeposit(provider, credentials, req.body);
+        if (!result.success) {
+          return sendErrorResponse(res, result.statusCode, result.errorCode!, result.errorMessage!);
         }
-        // Create an account and a completed transaction
-        const account = upsertAccount (provider.id, "external", provider.companyId, amount, "ILS");
-        const dateIso = dateRaw ? new Date(dateRaw).toISOString(): new Date().toISOString();
-        const desc = "External deposit";
-        const hash = transactionHash({ date: dateIso, chargedAmount: amount, description: desc}, provider.companyId, account.accountNumber);
-        const uniqueId = transactionUniqueId({ date: dateIso, chargedAmount: amount, description: desc}, provider.companyId, account.accountNumber);
-        upsertTransaction({
-          accountId: account.id,
-          type:"normal",
-          date: dateIso,
-          processedDate: dateIso,
-          originalAmount: amount,
-          originalCurrency: "ILS",
-          chargedAmount: amount,
-          chargedCurrency: "ILS",
-          description: desc,
-          status: "completed",
-          hash,
-          uniqueId,
-        });
-        return res.json({
-          success: true,
-          data: {
-            ...provider,
-            hasCredentials: false,
-            authStatus: "connected",
-            accounts: [account],
-            accountCount: 1,
-            transactionCount: 1,
-            requiresOtp: false,
-          },
-        });
+        return res.status(result.statusCode).json({ success: true, data: result.data });
       }
 
       let requiresOtp = false;
       let hasCredentials = false;
       let authStatus = "no";
       if (credentials) {
-        if (provider.companyId === "oneZero" && parseTwoFactorAuthInput(credentials) && !credentials.otpLongTermToken) {
-          try {
-            const otpResult = await startTwoFactorAuth(provider.companyId, credentials.phoneNumber);
-            if (otpResult.success) {
-              requiresOtp = true;
-              authStatus = "pending";
+        if (provider.companyId === "oneZero") {
+          const otpResult = await handleOneZeroOtp(provider, credentials, true);
+          if (otpResult) {
+            if (!otpResult.success) {
+              return sendErrorResponse(res, otpResult.statusCode, otpResult.errorCode!, otpResult.errorMessage!, otpResult.error);
             }
-          } catch (err) {
-            deleteProvider(provider.id);
-            return res.status(400).json({
-              success: false,
-              error: {
-                code: "OTP_TRIGGER_FAILED",
-                message: err instanceof Error ? err.message : "Failed to start OTP authentication",
-              },
-            });
+            return res.status(otpResult.statusCode).json({ success: true, data: otpResult.data });
           }
-        } else {
-          await storeCredentials(provider.alias, credentials);
-          hasCredentials = true;
-          authStatus = "pending";
         }
+        await storeCredentials(provider.alias, credentials);
+        hasCredentials = true;
+        authStatus = "pending";
       }
 
       return res.json({
@@ -587,13 +633,7 @@ export function startDashboard(port: number) {
         },
       });
     } catch (err) {
-      return res.status(500).json({
-        success: false,
-        error: {
-          code: "PROVIDER_CREATE_FAILED",
-          message: err instanceof Error ? err.message : "Failed to create provider",
-        },
-      });
+      return sendErrorResponse(res, 500, "PROVIDER_CREATE_FAILED", err instanceof Error ? err.message : "Failed to create provider", err);
     }
   });
 
@@ -613,20 +653,14 @@ export function startDashboard(port: number) {
       const { credentials, otpCode } = req.body;
       const provider = getProvider(id);
       if (!provider) {
-        return res.status(404).json({
-          success: false,
-          error: {
-            code: "NOT_FOUND",
-            message: "Provider not found",
-          },
-        });
+        return sendErrorResponse(res, 404, "NOT_FOUND", "Provider not found");
       }
 
       const otp = parseStringBody(otpCode);
       if (otp) {
         try {
           if (!credentials || !credentials.phoneNumber) {
-            throw new Error("Missing phone number for OTP exchange");
+            return sendErrorResponse(res, 400, "MISSING_PHONE_NUMBER", "Missing phone number for OTP exchange");
           }
           const otpLongTermToken = await exchangeOtpToken(credentials.phoneNumber, otp);
           await storeCredentials(provider.alias, {
@@ -647,102 +681,29 @@ export function startDashboard(port: number) {
             },
           });
         } catch (err) {
-          return res.status(400).json({
-            success: false,
-            error: {
-              code: "OTP_COMPLETE_FAILED",
-              message: err instanceof Error ? err.message : "Failed to complete OTP authentication",
-            },
-          });
+          return sendErrorResponse(res, 400, "OTP_COMPLETE_FAILED", err instanceof Error ? err.message : "Failed to complete OTP authentication", err);
         }
       }
 
       if (!credentials) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: "MISSING_CREDENTIALS",
-            message: "Missing credentials",
-          },
-        });
+        return sendErrorResponse(res, 400, "MISSING_CREDENTIALS", "Missing credentials");
       }
 
-      if (provider.companyId === "external_deposit") { // Accept amount/date via credentials for consistency with the UI
-        const amtRaw = credentials?.amount ?? req.body?. amount;
-        const dateRaw = credentials?.date ?? req.body?.date;
-        const amount = typeof amtRaw === "string"? Number(amtRaw) : Number (amtRaw ?? NaN);
-        if (!Number.isFinite (amount)) { // Clean up provider record
-            deleteProvider(provider.id);
-            return res.status(400).json({success: false,  error: { code: "INVALID_AMOUNT", message: "Invalid deposit amount" },  });
+      if (provider.companyId === "external_deposit") {
+        const result = handleExternalDeposit(provider, credentials, req.body);
+        if (!result.success) {
+          return sendErrorResponse(res, result.statusCode, result.errorCode!, result.errorMessage!);
         }
-        // Create an account and a completed transaction
-        const account = upsertAccount (provider.id, "external", provider.companyId, amount, "ILS");
-        const dateIso = dateRaw ? new Date(dateRaw).toISOString(): new Date().toISOString();
-        const desc = "External deposit";
-        const hash = transactionHash({ date: dateIso, chargedAmount: amount, description: desc}, provider.companyId, account.accountNumber);
-        const uniqueId = transactionUniqueId({ date: dateIso, chargedAmount: amount, description: desc}, provider.companyId, account.accountNumber);
-        upsertTransaction({
-          accountId: account.id,
-          type:"normal",
-          date: dateIso,
-          processedDate: dateIso,
-          originalAmount: amount,
-          originalCurrency: "ILS",
-          chargedAmount: amount,
-          chargedCurrency: "ILS",
-          description: desc,
-          status: "completed",
-          hash,
-          uniqueId,
-        });
-        return res.json({
-          success: true,
-          data: {
-            ...provider,
-            hasCredentials: false,
-            authStatus: "connected",
-            accounts: [account],
-            accountCount: 1,
-            transactionCount: 1,
-            requiresOtp: false,
-          },
-        });
+        return res.status(result.statusCode).json({ success: true, data: result.data });
       }
 
-      if (provider.companyId === "oneZero" && !credentials.phoneNumber) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: "INVALID_CREDENTIALS",
-            message: "One Zero credentials require email, password, and phoneNumber",
-          },
-        });
-      }
-
-      if (provider.companyId === "oneZero" && parseTwoFactorAuthInput(credentials) && !credentials.otpLongTermToken) {
-        try {
-          const otpResult = await startTwoFactorAuth(provider.companyId, credentials.phoneNumber);
-          if (otpResult.success)
-            return res.json({
-                success: true,
-                data: {
-                  ...provider,
-                  hasCredentials: false,
-                  authStatus: "pending",
-                  accounts: [],
-                  accountCount: 0,
-                  transactionCount: 0,
-                  requiresOtp: true,
-                },
-          });
-        } catch (err) {
-          return res.status(400).json({
-            success: false,
-            error: {
-              code: "OTP_TRIGGER_FAILED",
-              message: err instanceof Error ? err.message : "Failed to start OTP authentication",
-            },
-          });
+      if (provider.companyId === "oneZero") {
+        const otpResult = await handleOneZeroOtp(provider, credentials, false);
+        if (otpResult) {
+          if (!otpResult.success) {
+            return sendErrorResponse(res, otpResult.statusCode, otpResult.errorCode!, otpResult.errorMessage!, otpResult.error);
+          }
+          return res.status(otpResult.statusCode).json({ success: true, data: otpResult.data });
         }
       }
 
@@ -760,13 +721,7 @@ export function startDashboard(port: number) {
         },
       });
     } catch (err) {
-      return res.status(500).json({
-        success: false,
-        error: {
-          code: "PROVIDER_AUTH_FAILED",
-          message: err instanceof Error ? err.message : "Failed to update provider credentials",
-        },
-      });
+      return sendErrorResponse(res, 500, "PROVIDER_AUTH_FAILED", err instanceof Error ? err.message : "Failed to update provider credentials", err);
     }
   });
 
@@ -825,7 +780,7 @@ export function startDashboard(port: number) {
   app.get("/api/v2/pages/:id", (req, res) => {
     const page = getCustomPage(req.params.id);
     if (!page) {
-      return res.status(404).json({ success: false, error: "Page not found" });
+      return sendErrorResponse(res, 404, "PAGE_NOT_FOUND", "Page not found");
     }
     res.json({ success: true, data: page });
   });
@@ -833,7 +788,7 @@ export function startDashboard(port: number) {
   app.post("/api/v2/pages", (req, res) => {
     const verify = validatePage(req.body)
     if (!verify.success)
-      return res.status(400).json(verify)
+      return res.status(400).json(verify) // This is a validation error, not a generic API error. Keep as is.
     const created = createCustomPage(req.body);
     pageEvents.emit("changed", created.id);
     res.json({ success: true, data: created });
@@ -842,7 +797,7 @@ export function startDashboard(port: number) {
   app.put("/api/v2/pages/:id", (req, res) => {
     const updated = updateCustomPage(req.params.id, req.body);
     if (!updated) {
-      return res.status(404).json({ success: false, error: "Page not found" });
+      return sendErrorResponse(res, 404, "PAGE_NOT_FOUND", "Page not found");
     }
     pageEvents.emit("changed", updated.id);
     res.json({ success: true, data: updated });
@@ -851,7 +806,7 @@ export function startDashboard(port: number) {
   app.delete("/api/v2/pages/:id", (req, res) => {
     const deleted = deleteCustomPage(req.params.id);
     if (!deleted) {
-      return res.status(404).json({ success: false, error: "Page not found" });
+      return sendErrorResponse(res, 404, "PAGE_NOT_FOUND", "Page not found");
     }
     pageEvents.emit("deleted", req.params.id);
     res.json({ success: true });
@@ -860,7 +815,7 @@ export function startDashboard(port: number) {
   app.post("/api/v2/query", (req, res) => {
     const { queries } = req.body;
     if (!Array.isArray(queries)) {
-      return res.status(400).json({ success: false, error: "Invalid queries format" });
+      return sendErrorResponse(res, 400, "INVALID_QUERY_FORMAT", "Invalid queries format");
     }
     const results = executeQueryBatch(queries);
     res.json({ success: true, data: results });
@@ -878,7 +833,7 @@ export function startDashboard(port: number) {
   app.get("/api/v2/categories/transactions", (req, res) => {
     const category = firstQueryValue(req.query.cat);
     if (!category) {
-      return res.status(400).json({ success: false, error: "Missing category" });
+      return sendErrorResponse(res, 400, "MISSING_CATEGORY", "Missing category");
     }
     res.json({
       success: true,
@@ -890,7 +845,7 @@ export function startDashboard(port: number) {
     const name = parseStringBody(req.body.name);
     const classification = parseStringBody(req.body.classification) || "expense";
     if (!name) {
-      return res.status(400).json({ success: false, error: "Missing category name" });
+      return sendErrorResponse(res, 400, "MISSING_CATEGORY_NAME", "Missing category name");
     }
     const created = createCategory(name, classification as any);
     res.json({
@@ -903,7 +858,7 @@ export function startDashboard(port: number) {
     const name = req.params.name;
     const newName = parseStringBody(req.body.newName);
     if (!name || !newName) {
-      return res.status(400).json({ success: false, error: "Missing category name" });
+      return sendErrorResponse(res, 400, "MISSING_CATEGORY_NAME", "Missing category name");
     }
     const result = renameCategory(name, newName);
     res.json({ success: true, data: result });
@@ -912,7 +867,7 @@ export function startDashboard(port: number) {
   app.post("/api/v2/categories/:name/delete", (req, res) => {
     const name = req.params.name;
     if (!name) {
-      return res.status(400).json({ success: false, error: "Missing category name" });
+      return sendErrorResponse(res, 400, "MISSING_CATEGORY_NAME", "Missing category name");
     }
     const result = deleteCategory(name, "Uncategorized");
     res.json({ success: true, data: result });
@@ -922,7 +877,7 @@ export function startDashboard(port: number) {
     const name = req.params.name;
     const classification = parseStringBody(req.body.classification);
     if (!name || !classification) {
-      return res.status(400).json({ success: false, error: "Missing classification" });
+      return sendErrorResponse(res, 400, "MISSING_CLASSIFICATION", "Missing classification");
     }
     updateCategoryClassification(name, classification as any);
     res.json({ success: true, data: { name, classification } });
@@ -937,7 +892,7 @@ export function startDashboard(port: number) {
     const conditions = req.body.conditions ?? {};
     const priority = typeof req.body.priority === "number" ? req.body.priority : Number(req.body.priority ?? 0);
     if (!category) {
-      return res.status(400).json({ success: false, error: "Missing category" });
+      return sendErrorResponse(res, 400, "MISSING_CATEGORY", "Missing category");
     }
 
     const existing = findRuleByConditions(conditions);
@@ -958,7 +913,7 @@ export function startDashboard(port: number) {
   app.delete("/api/v2/categories/rules/:id", (req, res) => {
     const id = Number.parseInt(req.params.id, 10);
     if (!Number.isFinite(id)) {
-      return res.status(400).json({ success: false, error: "Invalid rule id" });
+      return sendErrorResponse(res, 400, "INVALID_RULE_ID", "Invalid rule id");
     }
     res.json({ success: true, data: { deleted: deleteCategoryRule(id) } });
   });
@@ -1012,7 +967,7 @@ export function startDashboard(port: number) {
     const englishName = parseStringBody(req.body.englishName);
     const matchPattern = parseStringBody(req.body.matchPattern);
     if (!englishName || !matchPattern) {
-      return res.status(400).json({ success: false, error: "Missing translation rule fields" });
+      return sendErrorResponse(res, 400, "MISSING_TRANSLATION_RULE_FIELDS", "Missing translation rule fields");
     }
 
     const { rule, created } = upsertTranslationRule(englishName, matchPattern);
@@ -1022,7 +977,7 @@ export function startDashboard(port: number) {
   app.delete("/api/v2/translations/rules/:id", (req, res) => {
     const id = Number.parseInt(req.params.id, 10);
     if (!Number.isFinite(id)) {
-      return res.status(400).json({ success: false, error: "Invalid rule id" });
+      return sendErrorResponse(res, 400, "INVALID_RULE_ID", "Invalid rule id");
     }
     res.json({ success: true, data: { deleted: deleteTranslationRule(id) } });
   });
@@ -1036,7 +991,7 @@ export function startDashboard(port: number) {
     const english = parseStringBody(req.body.english);
     const createRule = req.body.createRule === true;
     if (!hebrew || !english) {
-      return res.status(400).json({ success: false, error: "Missing translation fields" });
+      return sendErrorResponse(res, 400, "MISSING_TRANSLATION_FIELDS", "Missing translation fields");
     }
 
     const updated = updateTranslationByDescription(hebrew, english);
@@ -1072,7 +1027,7 @@ export function startDashboard(port: number) {
     const excludeClassifications = parseCsvList(req.query.exclude);
     const range = parseMonthToRange(month);
     if (!range) {
-      return res.status(400).json({ success: false, error: "Invalid month" });
+      return sendErrorResponse(res, 400, "INVALID_MONTH", "Invalid month");
     }
 
     const result = getSpending({
@@ -1099,7 +1054,7 @@ export function startDashboard(port: number) {
   app.get("/api/v2/trends/category", (req, res) => {
     const category = firstQueryValue(req.query.category);
     if (!category) {
-      return res.status(400).json({ success: false, error: "Missing category" });
+      return sendErrorResponse(res, 400, "MISSING_CATEGORY", "Missing category");
     }
     const months = parseOptionalNumber(req.query.months) ?? 6;
     const excludeClassifications = parseCsvList(req.query.exclude);
