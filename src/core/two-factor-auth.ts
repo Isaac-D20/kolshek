@@ -41,16 +41,13 @@ export async function startTwoFactorAuth(
       startDate: new Date(), // Not directly used for OTP, but required by interface
       verbose: true, // Enable for debugging
     });
-    console.log(`Triggering OTP for phone number: ${phoneNumber}`);
     const result = await scraper.triggerTwoFactorAuth(phoneNumber);
-    console.log(`OTP trigger result for ${phoneNumber}:`, result);
     if (!result.success) {
       throw new Error(result.errorMessage || "Failed to trigger OTP (scraper reported failure)");
     }
     startTwoFactorAuthSession(phoneNumber, scraper).catch(() => {});
     return result;
   } catch (err: any) {
-    console.error(`Error occurred while triggering OTP for ${phoneNumber}:`, err);
     throw new Error(`OTP_TRIGGER_FAILED: ${err.message || "Unknown error during OTP trigger process."}`);
   }
 }

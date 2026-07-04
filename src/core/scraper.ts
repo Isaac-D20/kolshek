@@ -95,7 +95,7 @@ export async function launchBrowser(
 
   // Determine initial headless flag. Default to true if not provided.
   let headlessFlag = options?.headless ?? true;
-  if (headlessFlag && process.platform === "linux" && !process.env.DISPLAY) {
+  if (!headlessFlag && process.platform === "linux" && !process.env.DISPLAY) {
     // No DISPLAY — cannot start headful Chrome. Log and fallback to headless.
     // eslint-disable-next-line no-console
     console.warn(
