@@ -37,6 +37,7 @@ import {
 import {
   listTransactions, updateTransactionCategory, countTransactions, upsertTransaction
 } from "../db/repositories/transactions.js";
+import type { TransactionFilters } from "../types/index.js";
 import { getMonthlyReport, getBalanceReport } from "../db/repositories/reports.js";
 import { listBudgets, setBudget } from "../db/repositories/budgets.js";
 import { updateAccountExcluded, purgeAccountData, getAccountsByProvider } from "../db/repositories/accounts.js";
@@ -100,6 +101,108 @@ function parseCsvList(value: unknown): string[] | undefined {
   if (raw == null || raw.trim() === "") return undefined;
   const values = raw.split(",").map((item) => item.trim()).filter(Boolean);
   return values.length > 0 ? values : undefined;
+}
+
+function parseTransactionFilters(query: Record<string, unknown>): TransactionFilters {
+  const filters: TransactionFilters = {};
+
+  const from = firstQueryValue(query.from);
+  if (from) filters.from = from;
+
+  const to = firstQueryValue(query.to);
+  if (to) filters.to = to;
+
+  const search =
+    firstQueryValue(query.search) ||
+    firstQueryValue(query.q) ||
+    firstQueryValue(query.description);
+  if (search) {
+    filters.search = search;
+    filters.description = search;
+  }
+
+  const provider = firstQueryValue(query.provider);
+  const providerId = parseOptionalNumber(query.providerId);
+  const providerCompanyId = firstQueryValue(query.providerCompanyId);
+
+  if (providerId !== undefined) {
+    filters.providerId = providerId;
+  } else if (providerCompanyId) {
+    filters.providerCompanyId = providerCompanyId;
+  } else if (provider && provider !== "__all__") {
+    filters.provider = provider;
+  }
+
+  const providerType =
+    firstQueryValue(query.providerType) || firstQueryValue(query.type);
+  if (providerType === "bank" || providerType === "credit_card") {
+    filters.providerType = providerType;
+  }
+
+  const accountId = parseOptionalNumber(query.accountId);
+  const accountNumber = firstQueryValue(query.accountNumber);
+  const account = firstQueryValue(query.account);
+
+  if (accountId !== undefined) {
+    filters.accountId = accountId;
+  } else if (accountNumber) {
+    filters.accountNumber = accountNumber;
+  } else if (account && account !== "__all__") {
+    filters.account = account;
+  }
+
+  const category =
+    firstQueryValue(query.category) || firstQueryValue(query.cat);
+  if (category && category !== "__all__") {
+    filters.category = category;
+  }
+
+  const status = firstQueryValue(query.status);
+  if (status && status !== "__all__") {
+    if (status === "completed" || status === "pending") {
+      filters.status = status;
+    }
+  }
+
+  const minAmount =
+    parseOptionalNumber(query.minAmount) ?? parseOptionalNumber(query.min);
+  if (minAmount !== undefined) {
+    filters.minAmount = minAmount;
+  }
+
+  const maxAmount =
+    parseOptionalNumber(query.maxAmount) ?? parseOptionalNumber(query.max);
+  if (maxAmount !== undefined) {
+    filters.maxAmount = maxAmount;
+  }
+
+  const translated = parseOptionalBoolean(query.translated);
+  if (translated !== undefined) {
+    filters.translated = translated;
+  }
+
+  const sort = firstQueryValue(query.sort);
+  if (sort === "date" || sort === "amount") {
+    filters.sort = sort;
+  }
+
+  const sortDirection =
+    firstQueryValue(query.sortDirection) || firstQueryValue(query.dir);
+  if (sortDirection === "asc" || sortDirection === "desc") {
+    filters.sortDirection = sortDirection;
+  }
+
+  const limit = parseOptionalNumber(query.limit);
+  if (limit !== undefined) {
+    filters.limit = limit;
+  }
+
+  const offset = parseOptionalNumber(query.offset);
+  if (offset !== undefined) {
+    filters.offset = offset;
+  }
+
+  return filters;
 }
 
 function parseStringBody(value: unknown): string {
@@ -1084,7 +1187,7 @@ export function startDashboard(port: number) {
 
   // Transactions
   app.get("/api/v2/transactions", (req, res) => {
-    const filters = req.query as any;
+    const filters = parseTransactionFilters(req.query);
     res.json({
       success: true,
       data: {

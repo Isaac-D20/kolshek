@@ -67,12 +67,15 @@ export interface TransactionFilters {
   providerId?: number;
   providerCompanyId?: string;
   providerType?: "bank" | "credit_card";
+  provider?: string;
   accountId?: number;
   accountNumber?: string;
+  account?: string;
   minAmount?: number;
   maxAmount?: number;
   status?: TransactionStatus;
   description?: string;
+  search?: string;
   category?: string | null;
   translated?: boolean;
   sort?: "date" | "amount";

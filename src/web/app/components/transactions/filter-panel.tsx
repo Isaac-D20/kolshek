@@ -53,7 +53,11 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
     }
     if (filters.provider) {
       const match = providers?.find(
-        (p) => String(p.id) === filters.provider
+        (p) =>
+          String(p.id) === filters.provider ||
+          p.companyId === filters.provider ||
+          p.displayName === filters.provider ||
+          p.alias === filters.provider
       );
       chips.push({
         key: "provider",
@@ -105,7 +109,7 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
   // Remove a single filter
   const removeFilter = useCallback(
     (key: keyof TransactionFilters) => {
-      const next = { ...filters };
+      const next = { ...filters, offset: 0 };
       delete next[key];
       onChange(next);
     },
@@ -227,7 +231,25 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
           <div className="space-y-1.5">
             <Label>Provider</Label>
             <Select
-              value={filters.provider || "__all__"}
+              value={
+                providers?.find(
+                  (p) =>
+                    String(p.id) === filters.provider ||
+                    p.companyId === filters.provider ||
+                    p.displayName === filters.provider ||
+                    p.alias === filters.provider
+                )
+                  ? String(
+                      providers.find(
+                        (p) =>
+                          String(p.id) === filters.provider ||
+                          p.companyId === filters.provider ||
+                          p.displayName === filters.provider ||
+                          p.alias === filters.provider
+                      )!.id
+                    )
+                  : filters.provider || "__all__"
+              }
               onValueChange={(val) =>
                 setFilter("provider", val === "__all__" ? undefined : val)
               }
