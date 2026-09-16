@@ -1,5 +1,6 @@
 // Transactions page — filter panel, data table, pagination, and detail sheet
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router";
 import { Download, Receipt } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Button } from "@/components/ui/button";
@@ -23,11 +24,48 @@ const DEFAULT_PAGE_SIZE = 50;
 
 export default function TransactionsPage() {
   useDocumentTitle("Transactions");
+  const [searchParams] = useSearchParams();
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [filters, setFilters] = useState<TransactionFilters>({
+
+  const initialProvider = searchParams.get("provider") || undefined;
+  const initialCategory = searchParams.get("category") || searchParams.get("cat") || undefined;
+  const initialSearch = searchParams.get("search") || searchParams.get("q") || undefined;
+  const initialFrom = searchParams.get("from") || undefined;
+  const initialTo = searchParams.get("to") || undefined;
+  const initialStatus = searchParams.get("status") || undefined;
+
+  const [filters, setFilters] = useState<TransactionFilters>(() => ({
     limit: DEFAULT_PAGE_SIZE,
     offset: 0,
-  });
+    ...(initialProvider ? { provider: initialProvider } : {}),
+    ...(initialCategory ? { category: initialCategory } : {}),
+    ...(initialSearch ? { search: initialSearch } : {}),
+    ...(initialFrom ? { from: initialFrom } : {}),
+    ...(initialTo ? { to: initialTo } : {}),
+    ...(initialStatus ? { status: initialStatus } : {}),
+  }));
+
+  useEffect(() => {
+    const provider = searchParams.get("provider") || undefined;
+    const category = searchParams.get("category") || searchParams.get("cat") || undefined;
+    const search = searchParams.get("search") || searchParams.get("q") || undefined;
+    const from = searchParams.get("from") || undefined;
+    const to = searchParams.get("to") || undefined;
+    const status = searchParams.get("status") || undefined;
+
+    if (provider || category || search || from || to || status) {
+      setFilters((prev) => ({
+        ...prev,
+        offset: 0,
+        ...(provider ? { provider } : {}),
+        ...(category ? { category } : {}),
+        ...(search ? { search } : {}),
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
+        ...(status ? { status } : {}),
+      }));
+    }
+  }, [searchParams]);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Detail sheet state

@@ -405,6 +405,44 @@ describe("listTransactions with filters", () => {
     }
   });
 
+  it("filters by search term in description, descriptionEn, or memo", () => {
+    const results = listTransactions({ search: "Shufersal" });
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    for (const tx of results) {
+      const match =
+        tx.description.toLowerCase().includes("shufersal") ||
+        (tx.descriptionEn && tx.descriptionEn.toLowerCase().includes("shufersal")) ||
+        (tx.memo && tx.memo.toLowerCase().includes("shufersal"));
+      expect(match).toBe(true);
+    }
+  });
+
+  it("filters by provider string identifier or name", () => {
+    const byCompany = listTransactions({ provider: "max" });
+    expect(byCompany.length).toBeGreaterThanOrEqual(1);
+    for (const tx of byCompany) {
+      expect(tx.providerCompanyId).toBe("max");
+    }
+
+    const byDisplayName = listTransactions({ provider: "Max" });
+    expect(byDisplayName.length).toBeGreaterThanOrEqual(1);
+    for (const tx of byDisplayName) {
+      expect(tx.providerDisplayName).toBe("Max");
+    }
+  });
+
+  it("filters by category", () => {
+    const foodTxns = listTransactions({ category: "Food" });
+    for (const tx of foodTxns) {
+      expect(tx.category).toBe("Food");
+    }
+
+    const uncatTxns = listTransactions({ category: "Uncategorized" });
+    for (const tx of uncatTxns) {
+      expect(tx.category === null || tx.category === "Uncategorized").toBe(true);
+    }
+  });
+
   it("sorts by amount ascending", () => {
     const txns = listTransactions({ sort: "amount", sortDirection: "asc" });
     for (let i = 1; i < txns.length; i++) {

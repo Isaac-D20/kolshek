@@ -5,6 +5,7 @@ import type {
 } from "../../types/index.js";
 import { getDatabase } from "../database.js";
 import { escapeLike } from "../utils.js";
+import { resolveProviders } from "./providers.js";
 
 interface TransactionWithContextRow {
   id: number;
@@ -254,43 +255,78 @@ function buildFilterClauses(filters: TransactionFilters): {
     // Append end-of-day so date-only filters include the full day
     params.to = filters.to.length === 10 ? filters.to + "T23:59:59.999Z" : filters.to;
   }
-  if (filters.providerId !== undefined) {
+  if (filters.providerId !== undefined && filters.providerId !== null && !isNaN(Number(filters.providerId))) {
     conditions.push("a.provider_id = $providerId");
-    params.providerId = filters.providerId;
-  }
-  if (filters.providerCompanyId) {
+    params.providerId = Number(filters.providerId);
+  } else if (filters.providerCompanyId) {
     conditions.push("p.company_id = $providerCompanyId");
     params.providerCompanyId = filters.providerCompanyId;
+  } else if (filters.provider && filters.provider !== "__all__") {
+    const numId = Number(filters.provider);
+    if (!isNaN(numId) && String(numId) === String(filters.provider).trim()) {
+      conditions.push("a.provider_id = $providerId");
+      params.providerId = numId;
+    } else {
+      const resolved = resolveProviders(filters.provider);
+      if (resolved.length === 1) {
+        conditions.push("a.provider_id = $providerId");
+        params.providerId = resolved[0].id;
+      } else if (resolved.length > 1) {
+        const ids = resolved.map((p) => p.id);
+        conditions.push(`a.provider_id IN (${ids.join(",")})`);
+      } else {
+        conditions.push(
+          "(p.company_id = $provider OR p.alias = $provider OR p.display_name = $provider)"
+        );
+        params.provider = filters.provider;
+      }
+    }
   }
+
   if (filters.providerType) {
     conditions.push("p.type = $providerType");
     params.providerType = filters.providerType;
   }
-  if (filters.accountId !== undefined) {
+
+  if (filters.accountId !== undefined && filters.accountId !== null && !isNaN(Number(filters.accountId))) {
     conditions.push("t.account_id = $accountId");
-    params.accountId = filters.accountId;
-  }
-  if (filters.accountNumber) {
+    params.accountId = Number(filters.accountId);
+  } else if (filters.accountNumber) {
     conditions.push("a.account_number = $accountNumber");
     params.accountNumber = filters.accountNumber;
+  } else if (filters.account && filters.account !== "__all__") {
+    const numAccountId = Number(filters.account);
+    if (!isNaN(numAccountId) && String(numAccountId) === String(filters.account).trim()) {
+      conditions.push("t.account_id = $accountId");
+      params.accountId = numAccountId;
+    } else {
+      conditions.push("a.account_number = $accountNumber");
+      params.accountNumber = filters.account;
+    }
   }
-  if (filters.minAmount !== undefined) {
+
+  if (filters.minAmount !== undefined && filters.minAmount !== null && !isNaN(Number(filters.minAmount))) {
     conditions.push("t.charged_amount >= $minAmount");
-    params.minAmount = filters.minAmount;
+    params.minAmount = Number(filters.minAmount);
   }
-  if (filters.maxAmount !== undefined) {
+  if (filters.maxAmount !== undefined && filters.maxAmount !== null && !isNaN(Number(filters.maxAmount))) {
     conditions.push("t.charged_amount <= $maxAmount");
-    params.maxAmount = filters.maxAmount;
+    params.maxAmount = Number(filters.maxAmount);
   }
-  if (filters.status) {
+  if (filters.status && (filters.status as string) !== "__all__") {
     conditions.push("t.status = $status");
     params.status = filters.status;
   }
-  if (filters.description) {
+  if (filters.search) {
+    conditions.push(
+      "(t.description LIKE $search ESCAPE '\\' OR t.description_en LIKE $search ESCAPE '\\' OR t.memo LIKE $search ESCAPE '\\')"
+    );
+    params.search = `%${escapeLike(filters.search)}%`;
+  } else if (filters.description) {
     conditions.push("t.description LIKE $description ESCAPE '\\'");
     params.description = `%${escapeLike(filters.description)}%`;
   }
-  if (filters.category !== undefined) {
+  if (filters.category !== undefined && filters.category !== "__all__") {
     if (filters.category === null || filters.category === "Uncategorized") {
       conditions.push("(t.category IS NULL OR t.category = 'Uncategorized')");
     } else {
@@ -322,12 +358,12 @@ export function listTransactions(
   const orderClause = `ORDER BY ${sortCol} ${sortDir}`;
 
   let limitClause = "";
-  if (filters.limit !== undefined) {
+  if (filters.limit !== undefined && !isNaN(Number(filters.limit))) {
     limitClause = "LIMIT $limit";
-    params.limit = filters.limit;
-    if (filters.offset !== undefined) {
+    params.limit = Number(filters.limit);
+    if (filters.offset !== undefined && !isNaN(Number(filters.offset))) {
       limitClause += " OFFSET $offset";
-      params.offset = filters.offset;
+      params.offset = Number(filters.offset);
     }
   }
 
@@ -359,12 +395,12 @@ export function searchTransactions(
   const orderClause = `ORDER BY ${sortCol} ${sortDir}`;
 
   let limitClause = "";
-  if (filters?.limit !== undefined) {
+  if (filters?.limit !== undefined && !isNaN(Number(filters.limit))) {
     limitClause = "LIMIT $limit";
-    params.limit = filters.limit;
-    if (filters.offset !== undefined) {
+    params.limit = Number(filters.limit);
+    if (filters.offset !== undefined && !isNaN(Number(filters.offset))) {
       limitClause += " OFFSET $offset";
-      params.offset = filters.offset;
+      params.offset = Number(filters.offset);
     }
   }
 
