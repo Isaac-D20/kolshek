@@ -1,0 +1,34 @@
+services:
+  kolshek:
+    image: ghcr.io/your-github-username/kolshek:latest
+    container_name: kolshek
+    restart: unless-stopped
+    ports:
+      - "${PORT}:${PORT}"
+    volumes:
+      - kolshek_data:/root/.local/share/kolshek-nodejs
+    environment:
+      - TZ=Asia/Jerusalem
+      - HOST=0.0.0.0
+      - PORT=<PORT>
+      - KOLSHEK_DISABLE_AUTH=1
+      - KOLSHEK_NO_SANDBOX=true
+      - KOLSHEK_CHROME_PATH=/usr/bin/google-chrome-stable
+      - CHROMIUM_FLAGS=--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage
+    shm_size: '1gb'
+    cap_add:
+      - SYS_ADMIN
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # This volume mounts your server's local docker config so watchtower can read the GHCR login token
+      - /root/.docker/config.json:/config.json:ro
+    command: --interval 30 --cleanup kolshek
+
+
+volumes:
+  kolshek_data:
