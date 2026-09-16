@@ -41,6 +41,7 @@ const PROVIDER_LIST = [
   { companyId: "discount", displayName: "Bank Discount", type: "bank" },
   { companyId: "mizrahi", displayName: "Bank Mizrahi", type: "bank" },
   { companyId: "mercantile", displayName: "Bank Mercantile", type: "bank" },
+  { companyId: "otsarHahayal", displayName: "Bank Otsar Hahayal", type: "bank" },
   { companyId: "beinleumi", displayName: "First International", type: "bank" },
   { companyId: "massad", displayName: "Bank Massad", type: "bank" },
   { companyId: "yahav", displayName: "Bank Yahav", type: "bank" },
