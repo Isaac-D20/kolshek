@@ -19,6 +19,7 @@ import {
   getMostRecentSyncTime,
   getProviderByAlias,
 } from "../db/repositories/providers.js";
+import { getDatabase } from "../db/database.js";
 import { upsertAccount } from "../db/repositories/accounts.js"
 import {
   listCategoryRules, applyCategoryRules, createCategoryRule, deleteCategoryRule,
@@ -262,13 +263,20 @@ interface HandlerResult {
 }
 
 // Helper to handle external deposit providers
-function handleExternalDeposit(provider: any, credentials: any, body: any): HandlerResult {
+function handleExternalDeposit(
+  provider: any,
+  credentials: any,
+  body: any,
+  isCreation: boolean = false
+): HandlerResult {
   const amtRaw = credentials?.amount ?? body?.amount;
   const dateRaw = credentials?.date ?? body?.date;
   const amount = typeof amtRaw === "string" ? Number(amtRaw) : Number(amtRaw ?? NaN);
 
   if (!Number.isFinite(amount)) {
-    deleteProvider(provider.id);
+    if (isCreation) {
+      deleteProvider(provider.id);
+    }
     return {
       success: false,
       statusCode: 400,
@@ -277,7 +285,25 @@ function handleExternalDeposit(provider: any, credentials: any, body: any): Hand
     };
   }
 
-  const account = upsertAccount(provider.id, "external", provider.companyId, amount, "ILS");
+  const existingAccounts = getAccountsByProvider(provider.id);
+  const accountNumber =
+    existingAccounts.length > 0
+      ? existingAccounts[0].accountNumber
+      : `external-${provider.id}`;
+
+  const account = upsertAccount(
+    provider.id,
+    accountNumber,
+    provider.companyId,
+    amount,
+    "ILS"
+  );
+
+  const db = getDatabase();
+  db.prepare("DELETE FROM transactions WHERE account_id = $accountId").run({
+    accountId: account.id,
+  });
+
   const dateIso = dateRaw ? new Date(dateRaw).toISOString() : new Date().toISOString();
   const desc = "External deposit";
   const hash = transactionHash({ date: dateIso, chargedAmount: amount, description: desc }, provider.companyId, account.accountNumber);
@@ -690,15 +716,27 @@ export function startDashboard(port: number) {
     try {
       const { companyId, alias, displayName, credentials } = req.body;
       const type = PROVIDERS[companyId as keyof typeof PROVIDERS]?.type || "bank";
-      const effectiveAlias = parseStringBody(alias) || parseStringBody(displayName) || companyId;
+      const userProvidedAlias = parseStringBody(alias);
+      let effectiveAlias = userProvidedAlias || parseStringBody(displayName) || PROVIDERS[companyId as keyof typeof PROVIDERS]?.displayName || companyId;
 
-      if (getProviderByAlias(effectiveAlias)) {
+      if (userProvidedAlias && getProviderByAlias(effectiveAlias)) {
         return sendErrorResponse(res, 409, "ALIAS_EXISTS", `A provider with alias "${effectiveAlias}" already exists`);
       }
 
-      const provider = createProvider(companyId, displayName || companyId, type, effectiveAlias);
+      if (!userProvidedAlias) {
+        let counter = 1;
+        let candidateAlias = effectiveAlias;
+        while (getProviderByAlias(candidateAlias)) {
+          counter++;
+          candidateAlias = `${effectiveAlias} ${counter}`;
+        }
+        effectiveAlias = candidateAlias;
+      }
+
+      const effectiveDisplayName = parseStringBody(displayName) || PROVIDERS[companyId as keyof typeof PROVIDERS]?.displayName || companyId;
+      const provider = createProvider(companyId, effectiveDisplayName, type, effectiveAlias);
       if (provider.companyId === "external_deposit") {
-        const result = handleExternalDeposit(provider, credentials, req.body);
+        const result = handleExternalDeposit(provider, credentials, req.body, true);
         if (!result.success) {
           return sendErrorResponse(res, result.statusCode, result.errorCode!, result.errorMessage!);
         }
@@ -793,7 +831,7 @@ export function startDashboard(port: number) {
       }
 
       if (provider.companyId === "external_deposit") {
-        const result = handleExternalDeposit(provider, credentials, req.body);
+        const result = handleExternalDeposit(provider, credentials, req.body, false);
         if (!result.success) {
           return sendErrorResponse(res, result.statusCode, result.errorCode!, result.errorMessage!);
         }
