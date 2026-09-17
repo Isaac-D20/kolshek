@@ -176,7 +176,8 @@ export function AddProviderWizard({
     createProvider.mutate(
       {
         companyId: selectedCompanyId,
-        alias: alias || selectedProvider?.displayName || selectedCompanyId,
+        alias: alias.trim() ? alias.trim() : undefined,
+        displayName: selectedProvider?.displayName || selectedCompanyId,
         credentials: bodyCredentials,
       },
       {

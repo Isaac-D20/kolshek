@@ -28,7 +28,8 @@ export function useCreateProvider() {
   return useMutation({
     mutationFn: (body: {
       companyId: string;
-      alias: string;
+      alias?: string;
+      displayName?: string;
       credentials: Record<string, string>;
     }) => api.post<ProviderCard>("/api/v2/providers", body),
     onSuccess: () => {
