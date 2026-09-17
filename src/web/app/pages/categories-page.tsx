@@ -53,7 +53,7 @@ export default function CategoriesPage() {
       {!isLoading && categories && categories.length > 0 && (
         <div className="flex gap-6">
           {/* Sidebar */}
-          <Card className="w-[250px] shrink-0 overflow-hidden">
+          <Card className="shrink-0 overflow-hidden">
             <CategorySidebar
               categories={categories}
               activeCategory={activeCategory}
