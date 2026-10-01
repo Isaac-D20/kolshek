@@ -4,7 +4,8 @@
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
-import { validateBinaryPath } from "./escape.js";
+import { splitCommandLine, validateBinaryPath } from "./escape.js";
+import { scheduleLogPath } from "../../config/schedule.js";
 
 const TASK_NAME = "KolShek Fetch";
 
@@ -28,8 +29,11 @@ function nowHHMM(): string {
 
 const backend: SchedulerBackend = {
   async register(config: ScheduleConfig): Promise<void> {
-    const safePath = validateBinaryPath(config.binaryPath);
-    const tr = `"${safePath}" fetch --non-interactive`;
+    validateBinaryPath(config.binaryPath);
+    const logPath = scheduleLogPath();
+    const args = [...splitCommandLine(config.binaryPath), "fetch", "--non-interactive"];
+    const commandLine = args.map((arg) => (arg.includes(" ") ? `"${arg}"` : arg)).join(" ");
+    const tr = `cmd.exe /c "${commandLine} >> "${logPath}" 2>&1"`;
     await run([
       "schtasks", "/Create",
       "/TN", TASK_NAME,

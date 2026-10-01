@@ -11,15 +11,21 @@ import { writeFile } from "../../cli/file-utils.js";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
-import { escapeXml, validateBinaryPath } from "./escape.js";
+import { escapeXml, splitCommandLine, validateBinaryPath } from "./escape.js";
+import { scheduleLogPath } from "../../config/schedule.js";
 
 const LABEL = "com.kolshek.fetch";
 const PLIST_DIR = join(homedir(), "Library", "LaunchAgents");
 const PLIST_PATH = join(PLIST_DIR, `${LABEL}.plist`);
-const LOG_PATH = join(homedir(), "Library", "Logs", "kolshek-fetch.log");
 
 function buildPlist(config: ScheduleConfig): string {
   const startInterval = config.intervalHours * 3600;
+  const logPath = scheduleLogPath();
+  const args = [...splitCommandLine(config.binaryPath), "fetch", "--non-interactive"];
+  const programArgsXml = args
+    .map((arg) => `        <string>${escapeXml(arg)}</string>`)
+    .join("\n");
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -28,18 +34,16 @@ function buildPlist(config: ScheduleConfig): string {
     <string>${LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${escapeXml(config.binaryPath)}</string>
-        <string>fetch</string>
-        <string>--non-interactive</string>
+${programArgsXml}
     </array>
     <key>StartInterval</key>
     <integer>${startInterval}</integer>
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>${escapeXml(LOG_PATH)}</string>
+    <string>${escapeXml(logPath)}</string>
     <key>StandardErrorPath</key>
-    <string>${escapeXml(LOG_PATH)}</string>
+    <string>${escapeXml(logPath)}</string>
 </dict>
 </plist>`;
 }
