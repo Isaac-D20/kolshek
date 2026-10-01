@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { escapeXml, shellQuote, systemdEscape } from "../../src/core/scheduler/escape.js";
+import {
+  escapeXml,
+  shellQuote,
+  systemdEscape,
+  splitCommandLine,
+  validateBinaryPath,
+} from "../../src/core/scheduler/escape.js";
 
 describe("escapeXml", () => {
   it("escapes ampersands", () => {
@@ -76,5 +82,70 @@ describe("systemdEscape", () => {
 
   it("handles empty string", () => {
     expect(systemdEscape("")).toBe('""');
+  });
+});
+
+describe("splitCommandLine", () => {
+  it("splits unquoted whitespace-separated tokens", () => {
+    expect(splitCommandLine("node dist/cli/index.js fetch")).toEqual([
+      "node",
+      "dist/cli/index.js",
+      "fetch",
+    ]);
+  });
+
+  it("preserves arguments enclosed in double quotes", () => {
+    expect(
+      splitCommandLine('"C:\\Program Files\\nodejs\\node.exe" "C:\\My App\\dist\\cli\\index.js"')
+    ).toEqual([
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\My App\\dist\\cli\\index.js",
+    ]);
+  });
+
+  it("preserves arguments enclosed in single quotes", () => {
+    expect(splitCommandLine("'/usr/local/bin/node' '/opt/kolshek/index.js'")).toEqual([
+      "/usr/local/bin/node",
+      "/opt/kolshek/index.js",
+    ]);
+  });
+
+  it("handles a single command without args", () => {
+    expect(splitCommandLine("/usr/local/bin/kolshek")).toEqual([
+      "/usr/local/bin/kolshek",
+    ]);
+  });
+
+  it("handles empty string", () => {
+    expect(splitCommandLine("")).toEqual([]);
+  });
+});
+
+describe("validateBinaryPath", () => {
+  it("allows valid path and quoted invocations", () => {
+    expect(validateBinaryPath("/usr/local/bin/kolshek")).toBe("/usr/local/bin/kolshek");
+    expect(
+      validateBinaryPath('"C:\\Program Files\\nodejs\\node.exe" "C:\\path\\index.js"')
+    ).toBe('"C:\\Program Files\\nodejs\\node.exe" "C:\\path\\index.js"');
+  });
+
+  it("throws on missing binaryPath", () => {
+    expect(() => validateBinaryPath("")).toThrow("binaryPath is required");
+  });
+
+  it("throws on control characters", () => {
+    expect(() => validateBinaryPath("/usr/bin/kolshek\nrm -rf /")).toThrow(
+      "binaryPath contains control characters"
+    );
+  });
+
+  it("throws on unsafe shell characters", () => {
+    expect(() => validateBinaryPath("kolshek & calc.exe")).toThrow(
+      "binaryPath contains unsafe shell characters"
+    );
+    expect(() => validateBinaryPath("kolshek | tee log")).toThrow(
+      "binaryPath contains unsafe shell characters"
+    );
+    expect(() => validateBinaryPath("kolshek; calc.exe")).not.toThrow();
   });
 });

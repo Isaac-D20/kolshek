@@ -10,7 +10,8 @@ import { writeFile } from "../../cli/file-utils.js";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
-import { shellQuote, systemdEscape, validateBinaryPath } from "./escape.js";
+import { shellQuote, splitCommandLine, systemdEscape, validateBinaryPath } from "./escape.js";
+import { scheduleLogPath } from "../../config/schedule.js";
 
 const UNIT_NAME = "kolshek-fetch";
 const SYSTEMD_DIR = join(homedir(), ".config", "systemd", "user");
@@ -19,12 +20,17 @@ const TIMER_PATH = join(SYSTEMD_DIR, `${UNIT_NAME}.timer`);
 const CRON_MARKER = "# kolshek-fetch";
 
 function buildService(config: ScheduleConfig): string {
+  const logPath = scheduleLogPath();
+  const args = [...splitCommandLine(config.binaryPath), "fetch", "--non-interactive"];
+  const execStart = args.map(systemdEscape).join(" ");
   return `[Unit]
 Description=KolShek automatic fetch
 
 [Service]
 Type=oneshot
-ExecStart=${systemdEscape(config.binaryPath)} fetch --non-interactive
+ExecStart=${execStart}
+StandardOutput=append:${logPath}
+StandardError=append:${logPath}
 `;
 }
 
@@ -111,7 +117,10 @@ async function cronRegister(config: ScheduleConfig): Promise<void> {
   const cronExpr = totalMin < 60
     ? `*/${totalMin} * * * *`
     : `0 */${Math.max(1, Math.round(config.intervalHours))} * * *`;
-  lines.push(`${cronExpr} ${shellQuote(config.binaryPath)} fetch --non-interactive ${CRON_MARKER}`);
+  const logPath = scheduleLogPath();
+  const args = [...splitCommandLine(config.binaryPath), "fetch", "--non-interactive"];
+  const command = args.map(shellQuote).join(" ");
+  lines.push(`${cronExpr} ${command} >> ${shellQuote(logPath)} 2>&1 ${CRON_MARKER}`);
   const newCrontab = lines.filter((l) => l.trim()).join("\n") + "\n";
   await run(["crontab", "-"], newCrontab);
 }
