@@ -198,7 +198,7 @@ export function registerInitCommand(program: Command): void {
               message: `${field}:`,
               mask: "*",
             });
-          } else if (field === "otpLongTermToken") {
+          } else if (field === "otpLongTermToken" || field === "idToken") {
             credentials[field] = await password({
               message: `${field} (leave empty if not available):`,
               mask: "*",

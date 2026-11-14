@@ -34,6 +34,7 @@ import {
   deleteCredentials,
   hasCredentials,
 } from "../../security/keychain.js";
+import { createScraper, CompanyTypes } from "israeli-bank-scrapers-core";
 import { computeAuthStatus } from "../../core/auth-status.js";
 import {
   startTwoFactorAuth,
@@ -72,18 +73,38 @@ async function resolveTwoFactorCredentialsIfNeeded(
 ): Promise<Record<string, string>> {
   if (companyId !== "oneZero") {
     return credentials;
-  };
+  }
+
+  if (credentials.idToken || credentials.otpLongTermToken) {
+    return credentials;
+  }
+
+  if (!credentials.phoneNumber) {
+    return credentials;
+  }
 
   await startTwoFactorAuth(companyId, credentials.phoneNumber);
   try {
     const otpCode = await input({
       message: "otp code:",
     });
-    const result = await exchangeOtpToken(credentials.phoneNumber, otpCode);
+    const otpToken = await exchangeOtpToken(credentials.phoneNumber, otpCode);
+    const scraper = createScraper({
+      companyId: CompanyTypes.oneZero,
+      startDate: new Date(),
+    }) as any;
+    const loginResult = await scraper.login({
+      email: credentials.email,
+      password: credentials.password,
+      otpLongTermToken: otpToken,
+    });
+    if (!loginResult.success || !loginResult.persistentOtpToken) {
+      throw new Error(loginResult.errorMessage || "Failed to obtain persistent ID token");
+    }
     return {
       email: credentials.email ?? "",
       password: credentials.password ?? "",
-      otpLongTermToken: result,
+      idToken: loginResult.persistentOtpToken,
     };
   } catch (err) {
     throw new Error(`Two-factor authentication failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -219,6 +240,11 @@ export function registerProvidersCommand(program: Command): void {
         if (field === "password") {
           credentials[field] = await password({
             message: `${field}:`,
+            mask: "*",
+          });
+        } else if (field === "otpLongTermToken" || field === "idToken") {
+          credentials[field] = await password({
+            message: `${field} (leave empty if not available):`,
             mask: "*",
           });
         } else {
@@ -410,7 +436,7 @@ export function registerProvidersCommand(program: Command): void {
             message: `${field}:`,
             mask: "*",
           });
-        } else if (field === "otpLongTermToken") {
+        } else if (field === "otpLongTermToken" || field === "idToken") {
           credentials[field] = await password({
             message: `${field} (leave empty if not available):`,
             mask: "*",

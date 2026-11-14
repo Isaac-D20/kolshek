@@ -8,7 +8,7 @@ description: >
 compatibility: Requires KolShek CLI (kolshek) installed and configured.
 metadata:
   author: kolshek
-  version: "0.4.8"
+  version: "0.4.8-fork.1"
 allowed-tools: Bash Read Write AskUserQuestion
 ---
 

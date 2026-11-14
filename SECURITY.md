@@ -2,10 +2,10 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in KolShek, please report it responsibly:
+If you discover a security vulnerability in this fork of KolShek, please report it responsibly:
 
 1. **Do not** open a public GitHub issue
-2. Email **security@kolshek.dev** or use [GitHub's private vulnerability reporting](https://github.com/DaveDushi/kolshek/security/advisories/new)
+2. Submit a report through private vulnerability reporting channels for this repository. If a vulnerability exists in upstream KolShek or underlying dependencies (e.g. `israeli-bank-scrapers`), consider responsibly notifying the respective maintainers as well.
 3. Include steps to reproduce, affected versions, and potential impact
 
 We aim to acknowledge reports within 48 hours and provide a fix within 7 days for critical issues.

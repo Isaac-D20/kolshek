@@ -1,4 +1,6 @@
-# KolShek Documentation
+# KolShek Documentation (Fork)
+
+> **Note:** This documentation reflects the community fork of KolShek.
 
 ## Guides
 

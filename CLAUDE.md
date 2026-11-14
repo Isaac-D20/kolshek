@@ -1,6 +1,6 @@
-# KolShek (כל שקל)
+# KolShek (כל שקל) [Fork]
 
-Israeli finance CLI — scrapes banks/credit cards via `israeli-bank-scrapers-core`.
+Israeli finance CLI (fork of upstream `DaveDushi/kolshek`) — scrapes banks/credit cards via `israeli-bank-scrapers-core`.
 
 ## Commands
 
