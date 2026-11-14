@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { randomBytes } from "node:crypto";
 import { setTimeout } from 'node:timers/promises';
 import { WEB_FILES } from "./web-files.js";
+import { createScraper, CompanyTypes } from "israeli-bank-scrapers-core";
 import { computeAuthStatus } from "../core/auth-status.js";
 import {
   startTwoFactorAuth,
@@ -338,17 +339,17 @@ function handleExternalDeposit(
   };
 }
 
-async function handleOneZeroOtp(provider: any, credentials: any, isCreation: boolean): Promise<HandlerResult | null> {
+async function handleTwoFactorAuth(provider: any, credentials: any, isCreation: boolean): Promise<HandlerResult | null> {
   if (!credentials.phoneNumber) {
     return {
       success: false,
       statusCode: 400,
       errorCode: "INVALID_CREDENTIALS",
-      errorMessage: "One Zero credentials require email, password, and phoneNumber",
+      errorMessage: "Two-Factor credentials require email, password, and phoneNumber",
     };
   }
 
-  if (parseTwoFactorAuthInput(credentials) && !credentials.otpLongTermToken) {
+  if (parseTwoFactorAuthInput(credentials) && !(credentials.otpLongTermToken || credentials.idToken)) {
     try {
       const otpResult = await startTwoFactorAuth(provider.companyId, credentials.phoneNumber);
       if (otpResult.success) {
@@ -417,7 +418,7 @@ export function startDashboard(port: number) {
   });
 
   // Asset Routes
-  app.get("*", (req, res, next) => {
+  app.get("/{*path}", (req, res, next) => {
     const asset = WEB_FILES[req.path];
     if (asset) {
       res.setHeader("Content-Type", asset.mime);
@@ -748,7 +749,7 @@ export function startDashboard(port: number) {
       let authStatus = "no";
       if (credentials) {
         if (provider.companyId === "oneZero") {
-          const otpResult = await handleOneZeroOtp(provider, credentials, true);
+          const otpResult = await handleTwoFactorAuth(provider, credentials, true);
           if (otpResult) {
             if (!otpResult.success) {
               return sendErrorResponse(res, otpResult.statusCode, otpResult.errorCode!, otpResult.errorMessage!, otpResult.error);
@@ -803,12 +804,29 @@ export function startDashboard(port: number) {
           if (!credentials || !credentials.phoneNumber) {
             return sendErrorResponse(res, 400, "MISSING_PHONE_NUMBER", "Missing phone number for OTP exchange");
           }
-          const otpLongTermToken = await exchangeOtpToken(credentials.phoneNumber, otp);
+          const otpToken = await exchangeOtpToken(credentials.phoneNumber, otp);
+          const scraper = createScraper({
+            companyId: CompanyTypes.oneZero,
+            startDate: new Date(),
+          }) as any;
+          const loginResult = await scraper.login({
+            email: credentials.email,
+            password: credentials.password,
+            otpLongTermToken: otpToken,
+          });
+          if (!loginResult.success || !loginResult.persistentOtpToken) {
+            return sendErrorResponse(
+              res,
+              400,
+              "AUTH_FAILED",
+              loginResult.errorMessage || "Failed to obtain persistent ID token",
+            );
+          }
           await storeCredentials(provider.alias, {
-              email: credentials.email,
-              password: credentials.password,
-              otpLongTermToken: otpLongTermToken,
-            });
+            email: credentials.email,
+            password: credentials.password,
+            idToken: loginResult.persistentOtpToken,
+          });
           return res.json({
             success: true,
             data: {
@@ -839,7 +857,7 @@ export function startDashboard(port: number) {
       }
 
       if (provider.companyId === "oneZero") {
-        const otpResult = await handleOneZeroOtp(provider, credentials, false);
+        const otpResult = await handleTwoFactorAuth(provider, credentials, false);
         if (otpResult) {
           if (!otpResult.success) {
             return sendErrorResponse(res, otpResult.statusCode, otpResult.errorCode!, otpResult.errorMessage!, otpResult.error);
@@ -1281,7 +1299,7 @@ export function startDashboard(port: number) {
   });
 
   // SPA Fallback
-  app.get("*", (_req, res) => {
+  app.get("/{*path}", (_req, res) => {
     res.setHeader("Content-Type", "text/html").send(WEB_FILES["/index.html"].content);
   });
 

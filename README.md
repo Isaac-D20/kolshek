@@ -2,17 +2,19 @@
 
 <img src="assets/logo.png" alt="KolShek logo" width="180" />
 
-# KolShek (כל שקל)
+# KolShek (כל שקל) — Fork
 
 **Your Israeli finances, locally, on your terms.**
 
 An open-source CLI that pulls transactions from Israeli banks and credit cards into a local SQLite database. No cloud. No telemetry. No account required.
 
-[Quick Start](#quick-start) &bull; [Features](#features) &bull; [Supported Providers](#supported-institutions) &bull; [Usage](#usage) &bull; [AI Skills](#ai-agent-skills) &bull; [Security](#security) &bull; [Docs](docs/)
+> **Fork Notice:** This repository is a community fork of the original [KolShek (כל שקל)](https://github.com/DaveDushi/kolshek) project by Dave Dushi. It provides independent maintenance, enhancements, and updates while remaining fully compatible with the local-first architecture.
+
+[Quick Start](#quick-start) &bull; [Features](#features) &bull; [Supported Providers](#supported-institutions) &bull; [Usage](#usage) &bull; [AI Skills](#ai-agent-skills) &bull; [Security](#security) &bull; [Docs](docs/) &bull; [Upstream Attribution](#upstream-attribution)
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/v/release/DaveDushi/kolshek)](https://github.com/DaveDushi/kolshek/releases)
-[![Website](https://img.shields.io/badge/site-kolshek.com-6366f1)](https://kolshek.com)
+[![Version](https://img.shields.io/badge/version-v0.4.8--fork.1-6366f1.svg)](CHANGELOG.md)
+[![Upstream](https://img.shields.io/badge/upstream-DaveDushi%2Fkolshek-informational.svg)](https://github.com/DaveDushi/kolshek)
 
 </div>
 
@@ -225,6 +227,10 @@ bun run dev -- <command>   # Run in dev mode
 bun test                   # Run tests
 bun run typecheck          # Type check
 ```
+
+## Upstream Attribution
+
+KolShek was originally conceived and created by [Dave Dushi](https://github.com/DaveDushi). This repository builds upon the foundational work established in the [original KolShek repository](https://github.com/DaveDushi/kolshek).
 
 ## Disclaimer
 

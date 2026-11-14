@@ -278,7 +278,7 @@ export function validatePage(input: unknown): { success: true; data: PageDefinit
     return { success: true, data: page };
   } catch (err) {
     const msg = err instanceof z.ZodError
-      ? err.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ")
+      ? err.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ")
       : err instanceof Error ? err.message : String(err);
     return { success: false, error: msg };
   }

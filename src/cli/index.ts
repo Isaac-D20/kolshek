@@ -44,7 +44,7 @@ const program = new Command();
 program
   .name("kolshek")
   .description(
-    "Track finances from Israeli banks and credit cards (כל שקל)",
+    "Track finances from Israeli banks and credit cards (כל שקל) [Fork]",
   )
   .addHelpText("beforeAll", () => getSplashBanner(program.opts().color !== false))
   .version(pkg.version)
