@@ -204,18 +204,8 @@ Config lives at your platform's standard config directory (e.g. `~/.config/kolsh
 ```bash
 git clone https://github.com/DaveDushi/kolshek.git
 cd kolshek
-bun install
-bun run build
-```
-
-Cross-platform builds:
-
-```bash
-bun run build:windows-x64
-bun run build:linux-x64
-bun run build:linux-arm64
-bun run build:macos-x64
-bun run build:macos-arm64
+npm install
+npm run build
 ```
 
 ## Contributing
@@ -223,9 +213,9 @@ bun run build:macos-arm64
 Contributions are welcome! Please open an issue first to discuss what you'd like to change.
 
 ```bash
-bun run dev -- <command>   # Run in dev mode
-bun test                   # Run tests
-bun run typecheck          # Type check
+npm run dev -- <command>   # Run in dev mode
+npm test                   # Run tests
+npm run typecheck          # Type check
 ```
 
 ## Upstream Attribution

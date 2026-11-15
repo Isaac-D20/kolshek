@@ -31,7 +31,7 @@ Run startup checks:
 
 **Resolve config dir** (needed for budget.toml later):
 ```
-bun -e "import envPaths from 'env-paths'; console.log(envPaths('kolshek').config)"
+node --input-type=module -e "import envPaths from 'env-paths'; console.log(envPaths('kolshek').config)"
 ```
 Store this path — you will use it in Step 7.
 

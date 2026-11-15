@@ -51,7 +51,7 @@ export function parseInterval(value: string): number | null {
 
 // Resolve the kolshek binary path or invocation for OS scheduler registration
 export async function resolveBinaryPath(): Promise<string> {
-  // If running as a standalone compiled binary (not node / bun / etc.)
+  // If running as a standalone compiled binary (not under Node.js)
   const execBase = basename(process.execPath).toLowerCase().replace(/\.exe$/, "");
   if (execBase === "kolshek") {
     return process.execPath;

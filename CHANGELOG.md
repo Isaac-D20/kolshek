@@ -85,7 +85,7 @@
 
 ### Bug Fixes
 
-- **AI model loading in compiled binary**: Rewrote the `node-llama-cpp` import strategy to reliably resolve the package and all its transitive dependencies (e.g. `lifecycle-utils`) when running as a compiled binary. Uses an ESM loader file placed in the install directory so Bun resolves from the correct `node_modules` tree.
+- **AI model loading in compiled binary**: Rewrote the `node-llama-cpp` import strategy to reliably resolve the package and all its transitive dependencies (e.g. `lifecycle-utils`) when running as a compiled binary. Uses an ESM loader file placed in the install directory so Node.js resolves from the correct `node_modules` tree.
 - **Model load errors now visible**: Errors during model loading are logged to the terminal instead of being silently returned as HTTP 400 responses.
 
 ---
@@ -94,7 +94,7 @@
 
 ### Features
 
-- **Auto-install AI runtime**: When loading a model for the first time, the dashboard automatically detects bun or npm and installs `node-llama-cpp` into the data directory. No manual setup required.
+- **Auto-install AI runtime**: When loading a model for the first time, the dashboard uses npm to install `node-llama-cpp` into the data directory. No manual setup required.
 
 ### Bug Fixes
 
@@ -108,7 +108,7 @@
 
 - **Dashboard assets in compiled binary**: The server now falls back to embedded assets when filesystem files don't exist, fixing "Not Found" errors when running the compiled binary on a fresh machine.
 - **Category classification**: Use upsert pattern for category rules, preventing duplicate constraint errors when reclassifying transactions.
-- **Auto-build in dev**: The `dashboard` command now auto-builds the React SPA if `dist/` is missing, so `bun run dev -- dashboard` works without a manual `bun run build:web` step.
+- **Auto-build in dev**: The `dashboard` command now auto-builds the React SPA if `dist/` is missing, so `npm run dev -- dashboard` works without a manual `npm run build:web` step.
 
 ---
 
@@ -255,7 +255,7 @@
 - **ReDoS prevention**: User-supplied regex patterns are validated for length, nested quantifiers, and excessive alternation before compilation.
 - **Error sanitization**: All API and SSE error responses strip file paths, stack traces, and internal details.
 - **Pagination limits**: Transaction endpoints capped at 500 rows per request to prevent database dumps.
-- **Windows permission fix**: Switched from Node's `child_process.spawnSync` to `Bun.spawnSync` for reliable `icacls` permission hardening.
+- **Windows permission fix**: Uses Node's `child_process.spawnSync` for reliable `icacls` permission hardening.
 
 ### Bug Fixes
 
@@ -300,7 +300,7 @@
 
 ### Security
 
-- **Migrated credential storage to Bun.secrets**: Replaced platform-specific subprocess wrappers (PowerShell+advapi32, macOS `security` CLI, Linux `secret-tool`) with Bun's native `Bun.secrets` API. Eliminates credential exposure in process listings and removes the PowerShell script injection surface.
+- **Migrated credential storage**: Uses platform keychains without exposing credentials in process listings or relying on PowerShell script injection.
 - **Input validation on credential aliases**: All credential storage functions now validate provider aliases against prototype pollution (`__proto__`, `constructor`), path traversal, and special character injection.
 - **Atomic credential file writes**: Encrypted credential files now use write-to-temp + rename to prevent corruption on crash or power loss.
 - **Windows permission hardening**: Credential files now get explicit owner-only ACLs via `icacls` (not just the parent directory). Permission failures are always logged instead of silently swallowed.
@@ -397,7 +397,7 @@
 - **Insights NaN crash**: `insights --months abc` no longer crashes with an unhandled `RangeError`; validates input and exits with a clear message.
 - **Identical alert/warning icons**: Alerts now display `[!!]` vs warnings `[!]` in no-color mode for visual distinction.
 - **Redundant SQL in cashflow query**: Simplified `getMonthCashflow` net calculation by removing a tautological `CASE WHEN`.
-- **JSDoc blocks in date-utils**: Converted to line comments for Bun 1.3.2 parser compatibility.
+- **JSDoc blocks in date-utils**: Converted to line comments for parser compatibility.
 
 ### Other
 

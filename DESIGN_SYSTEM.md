@@ -16,10 +16,10 @@ Source of truth for the settings dashboard CSS. Built with **Tailwind CSS v4** +
 
 ```bash
 # One-time build
-bun run build:css
+npm run build:css
 
 # Watch mode during development
-bun run dev:css
+npm run dev:css
 ```
 
 Source: `src/web/styles.css` → Output: `src/web/dist/styles.css` (minified via `@tailwindcss/cli`)

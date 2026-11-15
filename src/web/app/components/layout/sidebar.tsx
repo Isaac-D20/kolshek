@@ -29,7 +29,7 @@ import {useNavBadges} from "@/hooks/use-nav-badges";
 import {formatRelativeTime} from "@/lib/format";
 import {cn} from "@/lib/utils";
 import {SyncPanel} from "./sync-panel";
-import {useCustomPages, usePageEvents} from "@/hooks/use-custom-pages";
+import {useCustomPages} from "@/hooks/use-custom-pages";
 import {getIcon} from "@/lib/icon-map";
 
 // Navigation item definition
@@ -54,7 +54,6 @@ export function Sidebar() {
   const { alertCount, uncategorizedCount, untranslatedCount } = useNavBadges();
   const [syncPanelOpen, setSyncPanelOpen] = useState(false);
   const { data: customPages } = useCustomPages();
-  usePageEvents();
 
   // Build navigation groups with live badge data
   const navGroups: NavGroup[] = [

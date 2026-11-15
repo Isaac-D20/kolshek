@@ -1,15 +1,9 @@
-/**
- * Node.js compatible file utilities replacing Bun APIs.
- */
-
 import { promises as fs } from "fs";
 import { existsSync } from "fs";
 import { spawn, spawnSync } from "child_process";
 import type { SpawnSyncReturns, SpawnOptions } from "child_process";
 
-/**
- * Read a file as text (replaces Bun.file().text())
- */
+/** Read a file as text. */
 export async function readFile(filePath: string): Promise<string> {
   return fs.readFile(filePath, "utf-8");
 }
@@ -21,16 +15,12 @@ export function readFileSync(filePath: string): string {
   return require("fs").readFileSync(filePath, "utf-8");
 }
 
-/**
- * Check if a file exists (replaces Bun.file().exists())
- */
+/** Check if a file exists. */
 export function fileExists(filePath: string): boolean {
   return existsSync(filePath);
 }
 
-/**
- * Write a file (replaces Bun.write())
- */
+/** Write a file. */
 export async function writeFile(filePath: string, content: string | Buffer): Promise<void> {
   await fs.writeFile(filePath, content);
 }
@@ -42,10 +32,7 @@ export function writeFileSync(filePath: string, content: string | Buffer): void 
   require("fs").writeFileSync(filePath, content);
 }
 
-/**
- * Spawn a child process (replaces Bun.spawn())
- * Returns a promise that resolves when process exits
- */
+/** Spawn a child process and resolve when it exits. */
 export function spawnAsync(cmd: string[], options?: SpawnOptions & { stdio?: "inherit" | "pipe" }): Promise<number> {
   return new Promise((resolve, reject) => {
     const proc = spawn(cmd[0], cmd.slice(1), {
@@ -58,9 +45,7 @@ export function spawnAsync(cmd: string[], options?: SpawnOptions & { stdio?: "in
   });
 }
 
-/**
- * Spawn a child process synchronously (replaces Bun.spawnSync())
- */
+/** Spawn a child process synchronously. */
 export function spawnSync_compat(cmd: string[], options?: SpawnOptions): SpawnSyncReturns<Buffer> {
   return spawnSync(cmd[0], cmd.slice(1), {
     stdio: "inherit",
@@ -68,9 +53,7 @@ export function spawnSync_compat(cmd: string[], options?: SpawnOptions): SpawnSy
   });
 }
 
-/**
- * Read stdin stream (replaces Bun.stdin.stream())
- */
+/** Read stdin as text. */
 export async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) {
@@ -79,9 +62,7 @@ export async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf-8");
 }
 
-/**
- * Run a subprocess and capture output (replaces Bun.spawn() for pipe use)
- */
+/** Run a subprocess and capture its output. */
 export async function run(
   cmd: string[],
   stdin?: string,
@@ -118,5 +99,4 @@ export async function run(
     proc.on("error", reject);
   });
 }
-
 

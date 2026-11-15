@@ -33,7 +33,7 @@ interface GithubRelease {
   html_url: string;
 }
 
-// Map Bun's os/arch to our binary naming convention
+// Map Node.js platform/architecture values to our binary naming convention
 function getBinaryName(): string | null {
   const platform = process.platform;
   const arch = process.arch;

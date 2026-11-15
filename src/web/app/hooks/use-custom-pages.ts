@@ -37,11 +37,12 @@ export function useCustomPages() {
 }
 
 // Get a single page definition
-export function useCustomPage(id: string) {
+export function useCustomPage(id: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.customPages.detail(id),
     queryFn: () => api.get<CustomPageFull>(`/api/v2/pages/${id}`),
-    enabled: !!id,
+    enabled: !!id && enabled,
+    retry: false,
   });
 }
 
@@ -91,15 +92,22 @@ export function usePageEvents() {
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "page_changed" || data.type === "page_deleted") {
-          // Invalidate the pages list so sidebar refreshes
-          queryClient.invalidateQueries({ queryKey: queryKeys.customPages.all });
-          // If a specific page changed, invalidate its detail too
+        if (data.type === "page_changed") {
+          queryClient.invalidateQueries({ queryKey: queryKeys.customPages.list() });
           if (data.id) {
             queryClient.invalidateQueries({
               queryKey: queryKeys.customPages.detail(data.id),
             });
           }
+        } else if (data.type === "page_deleted") {
+          if (data.id) {
+            queryClient.cancelQueries({ queryKey: queryKeys.customPages.detail(data.id) });
+            queryClient.setQueryData(queryKeys.customPages.detail(data.id), null);
+            queryClient.removeQueries({
+              queryKey: queryKeys.customPages.detail(data.id),
+            });
+          }
+          queryClient.invalidateQueries({ queryKey: queryKeys.customPages.list() });
         }
       } catch {
         // ignore parse errors
@@ -115,19 +123,23 @@ export function useCreatePage() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (page: CreatePageInput) => api.post<CustomPageFull>("/api/v2/pages", page),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.customPages.all });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customPages.list() });
+      if (data?.id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.customPages.detail(data.id) });
+      }
     },
   });
 }
 
 // Update a custom page
 export function useUpdatePage() {
-    const queryClient = useQueryClient();
-    return useMutation({
+  const queryClient = useQueryClient();
+  return useMutation({
     mutationFn: ({ id, ...page }: CreatePageInput & { id: string }) => api.put<CustomPageFull>(`/api/v2/pages/${id}`, page),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.customPages.all });
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customPages.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.customPages.detail(variables.id) });
     },
   });
 }
@@ -137,8 +149,13 @@ export function useDeletePage() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/v2/pages/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.customPages.all });
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.customPages.detail(id) });
+      queryClient.setQueryData(queryKeys.customPages.detail(id), null);
+    },
+    onSuccess: (_data, id) => {
+      queryClient.removeQueries({ queryKey: queryKeys.customPages.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.customPages.list() });
     },
   });
 }

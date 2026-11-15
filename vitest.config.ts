@@ -1,30 +1,18 @@
 import { defineConfig } from "vitest/config";
-import { resolve } from "path";
+import react from "@vitejs/plugin-react-swc";
+import path from "node:path";
 
 export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
-      "bun:sqlite": resolve(__dirname, "tests/fixtures/bun-sqlite-mock.ts"),
+      "@": path.resolve("src/web/app"),
     },
   },
-  plugins: [
-    {
-      name: "bun-compat",
-      transform(code, id) {
-        // Replace Bun-specific import.meta.dir with Node-compatible equivalent
-        if (code.includes("import.meta.dir")) {
-          return code.replace(
-            /import\.meta\.dir/g,
-            'new URL(".", import.meta.url).pathname.replace(/^\\/([A-Z]:)/, "$1")',
-          );
-        }
-      },
-    },
-  ],
   test: {
     globals: true,
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],

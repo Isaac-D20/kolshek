@@ -777,7 +777,7 @@ kolshek spending -m 3         # 3 months ago</code></pre></div>
 
         <h3 class="docs-h3">Web Dashboard Security</h3>
         <ul class="docs-ul">
-          <li><strong>Localhost only</strong> — <code>Bun.serve()</code> binds to <code>hostname: "localhost"</code></li>
+          <li><strong>Session authentication</strong> — dashboard API requests require an authenticated session</li>
           <li><strong>CSRF protection</strong> — Origin header checked on all non-GET/HEAD requests</li>
           <li><strong>Security headers</strong> — <code>X-Content-Type-Options: nosniff</code> and <code>X-Frame-Options: DENY</code></li>
           <li><strong>XSS prevention</strong> — all user-controlled content is HTML-escaped</li>
@@ -886,7 +886,7 @@ kolshek db schema transactions --json</code></pre></div>
         </ul>
 
         <h3 class="docs-h3">Architecture</h3>
-        <p class="docs-p">Built with <strong>Bun.serve()</strong> (localhost-only HTTP server), <strong>React</strong> (full SPA with client-side routing), <strong>Tailwind CSS v4</strong> with <strong>Recharts</strong> for data visualization, and <strong>SSE</strong> for real-time per-provider sync progress. All data stays local.</p>
+        <p class="docs-p">Built with <strong>Express</strong> (Node.js HTTP server), <strong>React</strong> (full SPA with client-side routing), <strong>Tailwind CSS v4</strong> with <strong>Recharts</strong> for data visualization, and <strong>SSE</strong> for real-time per-provider sync progress. All data stays local.</p>
       </section>
 
       <!-- ── Changelog ──────────────────────────────────────────── -->
@@ -954,7 +954,7 @@ kolshek db schema transactions --json</code></pre></div>
         <h2 class="docs-h2">v0.4.3</h2>
         <h3 class="docs-h3">Features</h3>
         <ul class="docs-ul">
-          <li><strong>Auto-install AI runtime</strong> &mdash; When loading a model for the first time, the dashboard automatically detects bun or npm and installs <code class="docs-code">node-llama-cpp</code> into the data directory. No manual setup required.</li>
+          <li><strong>Auto-install AI runtime</strong> &mdash; When loading a model for the first time, the dashboard uses npm to install <code class="docs-code">node-llama-cpp</code> into the data directory. No manual setup required.</li>
         </ul>
         <h3 class="docs-h3">Bug Fixes</h3>
         <ul class="docs-ul">
@@ -1126,7 +1126,7 @@ kolshek db schema transactions --json</code></pre></div>
           <li><strong>ReDoS prevention</strong> &mdash; User-supplied regex patterns are validated for length, nested quantifiers, and excessive alternation before compilation.</li>
           <li><strong>Error sanitization</strong> &mdash; All API and SSE error responses strip file paths, stack traces, and internal details.</li>
           <li><strong>Pagination limits</strong> &mdash; Transaction endpoints capped at 500 rows per request to prevent database dumps.</li>
-          <li><strong>Windows permission fix</strong> &mdash; Switched from Node&rsquo;s <code class="docs-code">child_process.spawnSync</code> to <code class="docs-code">Bun.spawnSync</code> for reliable <code class="docs-code">icacls</code> permission hardening.</li>
+          <li><strong>Windows permission fix</strong> &mdash; Uses Node&rsquo;s <code class="docs-code">child_process.spawnSync</code> for reliable <code class="docs-code">icacls</code> permission hardening.</li>
         </ul>
 
         <h3 class="docs-h3">Bug Fixes</h3>
@@ -1173,7 +1173,7 @@ kolshek db schema transactions --json</code></pre></div>
         <h2 class="docs-h2">v0.3.5</h2>
         <h3 class="docs-h3">Security</h3>
         <ul class="docs-ul">
-          <li><strong>Migrated credential storage to Bun.secrets</strong> &mdash; replaces platform-specific subprocess wrappers with Bun&rsquo;s native API. Eliminates credential exposure in process listings.</li>
+          <li><strong>Credential storage migration</strong> &mdash; uses platform keychains without exposing credentials in process listings.</li>
           <li><strong>Input validation on credential aliases</strong> &mdash; validates against prototype pollution, path traversal, and special character injection.</li>
           <li><strong>Atomic credential file writes</strong> &mdash; write-to-temp + rename to prevent corruption on crash.</li>
           <li><strong>Windows permission hardening</strong> &mdash; credential files now get explicit owner-only ACLs via <code class="docs-code">icacls</code>.</li>
