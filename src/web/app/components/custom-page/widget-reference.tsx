@@ -38,6 +38,7 @@ const LAYOUT_DOCS: Record<string, DocItem> = {
       { name: "direction", type: "string", description: "Stack direction", options: ["vertical", "horizontal"] },
       { name: "gap", type: "number", description: "Gap between children (0-16)" },
       { name: "children", type: "Array[Widget]", description: "List of widgets to display", required: true },
+      ...BASE_LAYOUT_PROPS,
     ],
     example: {
       type: "stack",
@@ -53,6 +54,7 @@ const LAYOUT_DOCS: Record<string, DocItem> = {
       { name: "type", type: "string", description: "Must be 'grid'", required: true },
       { name: "columns", type: "object", description: "Columns per screen size (sm, md, lg)" },
       { name: "children", type: "Array[Widget]", description: "List of widgets to display", required: true },
+      ...BASE_LAYOUT_PROPS,
     ],
     example: {
       type: "grid",
@@ -72,6 +74,7 @@ const LAYOUT_DOCS: Record<string, DocItem> = {
       { name: "Tab.label", type: "string", description: "Tab label", required: true },
       { name: "Tab.value", type: "string", description: "Unique identifier for tab", required: true },
       { name: "Tab.children", type: "Array[Widget]", description: "Content to display for each tab", required: true },
+      ...BASE_LAYOUT_PROPS,
     ],
     example: {
       type: "tabs",
@@ -92,6 +95,7 @@ const WIDGET_DOCS: Record<string, DocItem> = {
       { name: "content", type: "string", description: "Static text to display" },
       { name: "size", type: "string", description: "Size of the text", options: ["sm", "base", "lg", "xl"] },
       { name: "wrapped", type: "boolean", description: "Wrap text inside a card if true" },
+      ...BASE_WIDGET_PROPS,
     ],
     example: {
       type: "text",
@@ -107,6 +111,7 @@ const WIDGET_DOCS: Record<string, DocItem> = {
       { name: "query", type: "Query", description: "Data source for the value", required: true },
       { name: "label", type: "string", description: "Label for the metric" },
       { name: "format", type: "string", description: "Value formatting", options: ["currency", "number", "percent"] },
+      ...BASE_WIDGET_PROPS,
     ],
     example: {
       type: "metric-card",
@@ -123,6 +128,7 @@ const WIDGET_DOCS: Record<string, DocItem> = {
       { name: "chartType", type: "string", description: "The type of chart", required: true, options: ["line", "bar", "area", "pie", "donut"] },
       { name: "query", type: "Query", description: "Data source (usually 'trend' or 'aggregate')", required: true },
       { name: "height", type: "number", description: "Height in pixels (default: 300)" },
+      ...BASE_WIDGET_PROPS,
     ],
     example: {
       type: "chart",
@@ -144,6 +150,7 @@ const WIDGET_DOCS: Record<string, DocItem> = {
       { name: "Column.key", type: "string", description: "Column key" },
       { name: "Column.label", type: "string", description: "Column label" },
       { name: "Column.format", type: "string", description: "Value formatting", options: ["currency", "number", "percent", "date", "text"] },
+      ...BASE_WIDGET_PROPS,
     ],
     example: {
       type: "table",
@@ -158,6 +165,7 @@ const WIDGET_DOCS: Record<string, DocItem> = {
       { name: "query", type: "Query", description: "Data source", required: true },
       { name: "target", type: "number", description: "Static target value" },
       { name: "format", type: "string", description: "Formatting", options: ["currency", "number", "percent"] },
+      ...BASE_WIDGET_PROPS,
     ],
     example: {
       type: "progress-bar",
@@ -175,6 +183,7 @@ const WIDGET_DOCS: Record<string, DocItem> = {
       { name: "labels", type: "tuple[string]", description: "Labels for each data source" },
       { name: "format", type: "string", description: "Value formatting", options: ["currency", "number", "percent"] },
       { name: "higherIsBetter", type: "boolean", description: "Indicates if a higher value is better" },
+      ...BASE_WIDGET_PROPS,
     ],
     example: {
       type: "comparison",
@@ -195,6 +204,7 @@ const WIDGET_DOCS: Record<string, DocItem> = {
       { name: "condition", type: "string", description: "Comparison condition", options: ["above", "below"] },
       { name: "severity", type: "string", description: "Alert severity", options: ["info", "warning", "error"] },
       { name: "message", type: "string", description: "Template: use {{value}} and {{threshold}}", required: true },
+      ...BASE_WIDGET_PROPS,
     ],
     example: {
       type: "alert",
@@ -212,6 +222,7 @@ const WIDGET_DOCS: Record<string, DocItem> = {
     props: [
       { name: "type", type: "string", description: "Must be 'filter-bar'", required: true },
       { name: "filters", type: "Array[string]", description: "List of active filters", options: ["dateRange", "category", "provider", "direction"] },
+      ...BASE_WIDGET_PROPS,
     ],
     example: {
       type: "filter-bar",
@@ -340,15 +351,6 @@ export function WidgetReference() {
     key.includes(search.toLowerCase()) || item.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  filteredLayouts.forEach(([_k, item]) => {
-    if (!item.props.every(prop => prop.name === "title" || prop.name === "className"))
-      item.props.push(...BASE_LAYOUT_PROPS)
-  });
-  filteredWidgets.forEach(([_k, item]) => {
-    if (!item.props.every(prop => prop.name === "title" || prop.name === "className"))
-      item.props.push(...BASE_WIDGET_PROPS)
-  })
-
   return (
     <Card className="h-full flex flex-col border-none shadow-none bg-transparent">
       <CardHeader className="px-0 pt-0">
@@ -412,6 +414,7 @@ function DocSection({ id, item, onCopy, copied }: { id: string, item: DocItem, o
           {item.name} <code className="text-[10px] font-normal opacity-60 bg-muted px-1 rounded">{id}</code>
         </h3>
         <Button 
+          type="button"
           variant="ghost" 
           size="icon" 
           className="h-7 w-7" 

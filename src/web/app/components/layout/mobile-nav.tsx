@@ -34,7 +34,7 @@ import { useSync } from "@/hooks/use-sync";
 import { useNavBadges } from "@/hooks/use-nav-badges";
 import { cn } from "@/lib/utils";
 import { SyncPanel } from "./sync-panel";
-import { useCustomPages, usePageEvents } from "@/hooks/use-custom-pages";
+import { useCustomPages } from "@/hooks/use-custom-pages";
 import { getIcon } from "@/lib/icon-map";
 
 // Bottom tab items -- the 4 visible tabs + More
@@ -69,7 +69,6 @@ export function MobileNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [syncPanelOpen, setSyncPanelOpen] = useState(false);
   const { data: customPages } = useCustomPages();
-  usePageEvents();
 
   const isActive = useCallback(
     (path: string) => {

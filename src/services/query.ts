@@ -29,6 +29,15 @@ function parsePeriod(period?: string): ParsedFilters {
     const m = String(now.getMonth() + 1).padStart(2, "0");
     return { from: `${y}-${m}-01`, to: `${y}-${m}-31T23:59:59.999Z` };
   }
+  if (period === "year") {
+    // Current year
+    const y = now.getFullYear();
+    return { from: `${y}-01-01`, to: `${y}-12-31T23:59:59.999Z` };
+  }
+  // Single year: "2026"
+  if (/^\d{4}$/.test(period)) {
+    return { from: `${period}-01-01`, to: `${period}-12-31T23:59:59.999Z` };
+  }
   // Relative days: "90d", "30d", etc.
   const daysMatch = period.match(/^(\d+)d$/);
   if (daysMatch) {

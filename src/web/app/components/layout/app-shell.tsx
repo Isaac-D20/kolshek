@@ -3,12 +3,14 @@ import type { ReactNode } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
+import { usePageEvents } from "@/hooks/use-custom-pages";
 
 interface AppShellProps {
   children: ReactNode;
 }
 
 export function AppShell({ children }: AppShellProps) {
+  usePageEvents();
   return (
     <TooltipProvider delayDuration={300}>
       <div className="relative min-h-screen bg-background">

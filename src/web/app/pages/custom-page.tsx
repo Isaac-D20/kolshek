@@ -15,10 +15,10 @@ import { cn } from "@/lib/utils";
 
 export default function CustomPage() {
   const { pageId } = useParams<{ pageId: string }>();
-  const { data: page, isLoading, isError, error } = useCustomPage(pageId ?? "");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { data: page, isLoading, isError, error } = useCustomPage(pageId ?? "", !isDeleting);
   const deletePage = useDeletePage();
   const { start, isRunning } = useSync();
-  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
   useDocumentTitle(page?.title ?? "Custom Page");
@@ -40,7 +40,7 @@ export default function CustomPage() {
     setIsDeleting(true);
     try {
       await deletePage.mutateAsync(page.id);
-      window.location.href = "/";
+      navigate("/");
     } catch (err) {
       alert("Failed to delete page");
       setIsDeleting(false);

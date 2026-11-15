@@ -385,7 +385,11 @@ async function handleTwoFactorAuth(provider: any, credentials: any, isCreation: 
 
 // Helper to send consistent error responses
 function sendErrorResponse(res: express.Response, statusCode: number, code: string, message: string, error?: any) {
-  console.error(`[API Error] ${code}: ${message}`, error);
+  if (error !== undefined) {
+    console.error(`[API Error] ${code}: ${message}`, error);
+  } else {
+    console.error(`[API Error] ${code}: ${message}`);
+  }
   return res.status(statusCode).json({
     success: false,
     error: {
@@ -438,6 +442,16 @@ export function startDashboard(port: number) {
       return sendErrorResponse(res, 409, "SYNC_IN_PROGRESS", "Sync already in progress");
     }
 
+    const {
+      providers: providerIds,
+      visible,
+      from,
+      to,
+      force,
+      type,
+      stealth,
+    } = req.body ?? {};
+
     const { sendEvent, controller } = setupSseStream(res);
 
     res.on("close", () => {
@@ -448,15 +462,6 @@ export function startDashboard(port: number) {
     });
 
     currentSyncAbort = controller;
-    const {
-      providers: providerIds,
-      visible,
-      from,
-      to,
-      force,
-      type,
-      stealth,
-    } = req.body;
 
     try {
       const allProviders = listProviders();
@@ -669,7 +674,7 @@ export function startDashboard(port: number) {
   });
 
   app.post("/api/v2/schedule", async (req, res) => {
-    const { intervalHours } = req.body;
+    const { intervalHours } = req.body ?? {};
     const binaryPath = await resolveBinaryPath();
     const config = {
       intervalHours,
@@ -715,7 +720,7 @@ export function startDashboard(port: number) {
 
   app.post("/api/v2/providers", async (req, res) => {
     try {
-      const { companyId, alias, displayName, credentials } = req.body;
+      const { companyId, alias, displayName, credentials } = req.body ?? {};
       const type = PROVIDERS[companyId as keyof typeof PROVIDERS]?.type || "bank";
       const userProvidedAlias = parseStringBody(alias);
       let effectiveAlias = userProvidedAlias || parseStringBody(displayName) || PROVIDERS[companyId as keyof typeof PROVIDERS]?.displayName || companyId;
@@ -737,7 +742,7 @@ export function startDashboard(port: number) {
       const effectiveDisplayName = parseStringBody(displayName) || PROVIDERS[companyId as keyof typeof PROVIDERS]?.displayName || companyId;
       const provider = createProvider(companyId, effectiveDisplayName, type, effectiveAlias);
       if (provider.companyId === "external_deposit") {
-        const result = handleExternalDeposit(provider, credentials, req.body, true);
+        const result = handleExternalDeposit(provider, credentials, req.body ?? {}, true);
         if (!result.success) {
           return sendErrorResponse(res, result.statusCode, result.errorCode!, result.errorMessage!);
         }
@@ -792,7 +797,7 @@ export function startDashboard(port: number) {
   app.post("/api/v2/providers/:id/auth", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { credentials, otpCode } = req.body;
+      const { credentials, otpCode } = req.body ?? {};
       const provider = getProvider(id);
       if (!provider) {
         return sendErrorResponse(res, 404, "NOT_FOUND", "Provider not found");
@@ -849,7 +854,7 @@ export function startDashboard(port: number) {
       }
 
       if (provider.companyId === "external_deposit") {
-        const result = handleExternalDeposit(provider, credentials, req.body, false);
+        const result = handleExternalDeposit(provider, credentials, req.body ?? {}, false);
         if (!result.success) {
           return sendErrorResponse(res, result.statusCode, result.errorCode!, result.errorMessage!);
         }
@@ -945,16 +950,16 @@ export function startDashboard(port: number) {
   });
 
   app.post("/api/v2/pages", (req, res) => {
-    const verify = validatePage(req.body)
+    const verify = validatePage(req.body ?? {})
     if (!verify.success)
       return res.status(400).json(verify) // This is a validation error, not a generic API error. Keep as is.
-    const created = createCustomPage(req.body);
+    const created = createCustomPage(req.body ?? {});
     pageEvents.emit("changed", created.id);
     res.json({ success: true, data: created });
   });
 
   app.put("/api/v2/pages/:id", (req, res) => {
-    const updated = updateCustomPage(req.params.id, req.body);
+    const updated = updateCustomPage(req.params.id, req.body ?? {});
     if (!updated) {
       return sendErrorResponse(res, 404, "PAGE_NOT_FOUND", "Page not found");
     }
@@ -972,7 +977,7 @@ export function startDashboard(port: number) {
   });
 
   app.post("/api/v2/query", (req, res) => {
-    const { queries } = req.body;
+    const { queries } = req.body ?? {};
     if (!Array.isArray(queries)) {
       return sendErrorResponse(res, 400, "INVALID_QUERY_FORMAT", "Invalid queries format");
     }
@@ -1001,8 +1006,8 @@ export function startDashboard(port: number) {
   });
 
   app.post("/api/v2/categories", (req, res) => {
-    const name = parseStringBody(req.body.name);
-    const classification = parseStringBody(req.body.classification) || "expense";
+    const name = parseStringBody(req.body?.name);
+    const classification = parseStringBody(req.body?.classification) || "expense";
     if (!name) {
       return sendErrorResponse(res, 400, "MISSING_CATEGORY_NAME", "Missing category name");
     }
@@ -1015,7 +1020,7 @@ export function startDashboard(port: number) {
 
   app.post("/api/v2/categories/:name/rename", (req, res) => {
     const name = req.params.name;
-    const newName = parseStringBody(req.body.newName);
+    const newName = parseStringBody(req.body?.newName);
     if (!name || !newName) {
       return sendErrorResponse(res, 400, "MISSING_CATEGORY_NAME", "Missing category name");
     }
@@ -1034,7 +1039,7 @@ export function startDashboard(port: number) {
 
   app.put("/api/v2/categories/:name/classification", (req, res) => {
     const name = req.params.name;
-    const classification = parseStringBody(req.body.classification);
+    const classification = parseStringBody(req.body?.classification);
     if (!name || !classification) {
       return sendErrorResponse(res, 400, "MISSING_CLASSIFICATION", "Missing classification");
     }
@@ -1047,9 +1052,9 @@ export function startDashboard(port: number) {
   });
 
   app.post("/api/v2/categories/rules", (req, res) => {
-    const category = parseStringBody(req.body.category);
-    const conditions = req.body.conditions ?? {};
-    const priority = typeof req.body.priority === "number" ? req.body.priority : Number(req.body.priority ?? 0);
+    const category = parseStringBody(req.body?.category);
+    const conditions = req.body?.conditions ?? {};
+    const priority = typeof req.body?.priority === "number" ? req.body.priority : Number(req.body?.priority ?? 0);
     if (!category) {
       return sendErrorResponse(res, 400, "MISSING_CATEGORY", "Missing category");
     }
@@ -1123,8 +1128,8 @@ export function startDashboard(port: number) {
   });
 
   app.post("/api/v2/translations/rules", (req, res) => {
-    const englishName = parseStringBody(req.body.englishName);
-    const matchPattern = parseStringBody(req.body.matchPattern);
+    const englishName = parseStringBody(req.body?.englishName);
+    const matchPattern = parseStringBody(req.body?.matchPattern);
     if (!englishName || !matchPattern) {
       return sendErrorResponse(res, 400, "MISSING_TRANSLATION_RULE_FIELDS", "Missing translation rule fields");
     }
@@ -1146,9 +1151,9 @@ export function startDashboard(port: number) {
   });
 
   app.post("/api/v2/translations/translate", (req, res) => {
-    const hebrew = parseStringBody(req.body.hebrew);
-    const english = parseStringBody(req.body.english);
-    const createRule = req.body.createRule === true;
+    const hebrew = parseStringBody(req.body?.hebrew);
+    const english = parseStringBody(req.body?.english);
+    const createRule = req.body?.createRule === true;
     if (!hebrew || !english) {
       return sendErrorResponse(res, 400, "MISSING_TRANSLATION_FIELDS", "Missing translation fields");
     }
@@ -1255,7 +1260,7 @@ export function startDashboard(port: number) {
 
   app.patch("/api/v2/transactions/:id/category", (req, res) => {
     const id = parseInt(req.params.id);
-    const { category } = req.body;
+    const { category } = req.body ?? {};
     updateTransactionCategory(id, category);
     res.json({ success: true });
   });
@@ -1263,7 +1268,7 @@ export function startDashboard(port: number) {
   // Budgets
   app.get("/api/v2/budgets", (_req, res) => res.json({ success: true, data: listBudgets() }));
   app.post("/api/v2/budgets", (req, res) => {
-    setBudget(req.body.category, req.body.amount, req.body.period);
+    setBudget(req.body?.category, req.body?.amount, req.body?.period);
     res.json({ success: true });
   });
 
@@ -1285,6 +1290,9 @@ export function startDashboard(port: number) {
 
   // Generic error handling for API routes
   app.use("/api/", (err: any, _req: any, res: any, next: any) => {
+    if (res.headersSent) {
+      return next(err);
+    }
     if (err) {
       console.error("[API Error]", err);
       return res.status(err.status || 500).json({
