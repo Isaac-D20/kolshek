@@ -92,6 +92,19 @@ describe("Visual Page Builder Tree Utilities", () => {
     expect(deleted.children?.[0]?.type).toBe("grid");
   });
 
+  it("preserves the root when deletion is requested at the empty path", () => {
+    expect(deleteNode(sampleTree, [])).toBe(sampleTree);
+  });
+
+  it("deletes nested children without changing the original tree", () => {
+    const deleted = deleteNode(sampleTree, ["children", 1, "children", 0]);
+
+    expect(getNode(deleted, ["children", 1, "children"])).toEqual([
+      { type: "text", content: "Notes" },
+    ]);
+    expect(getNode(sampleTree, ["children", 1, "children", 0])?.type).toBe("chart");
+  });
+
   it("identifies container nodes correctly", () => {
     expect(isContainer({ type: "stack" })).toBe(true);
     expect(isContainer({ type: "grid" })).toBe(true);

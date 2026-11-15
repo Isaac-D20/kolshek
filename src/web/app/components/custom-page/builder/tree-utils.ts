@@ -158,8 +158,7 @@ export function updateNode(
 
 export function deleteNode(root: WidgetNode, path: Path): WidgetNode {
   if (path.length === 0) {
-    // Cannot delete root, reset to empty stack
-    return { type: "stack", children: [] };
+    return root;
   }
 
   const clone = structuredClone(root);

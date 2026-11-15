@@ -66,7 +66,7 @@ export function VisualCanvas({
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
 
-  const selectedPathStr = selectedPath ? pathToString(selectedPath) : "";
+  const selectedPathStr = selectedPath === null ? null : pathToString(selectedPath);
 
   const handleDrop = (e: React.DragEvent, containerPath: Path, index: number) => {
     e.preventDefault();
@@ -134,7 +134,7 @@ export function VisualCanvas({
     totalSiblings?: number,
   ): React.ReactNode => {
     const pathStr = pathToString(currentPath);
-    const isSelected = selectedPathStr === pathStr;
+    const isSelected = selectedPathStr !== null && selectedPathStr === pathStr;
     const Icon = ICON_BY_TYPE[node.type] || Layers;
     const isLayout = node.type === "stack" || node.type === "grid" || node.type === "tabs";
 

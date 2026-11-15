@@ -63,16 +63,18 @@ export function PropertyInspector({
               {selectedNode.title || `Configure ${widgetType}`}
             </CardDescription>
           </div>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-destructive hover:bg-destructive/10"
-            onClick={() => onDeleteNode(selectedPath)}
-            title="Delete this component"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {selectedPath.length > 0 && (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-destructive hover:bg-destructive/10"
+              onClick={() => onDeleteNode(selectedPath)}
+              title="Delete this component"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </CardHeader>
 

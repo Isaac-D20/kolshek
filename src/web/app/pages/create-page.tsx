@@ -176,7 +176,7 @@ export default function CreatePage() {
   });
 
   const [jsonText, setJsonText] = useState<string>(() => JSON.stringify(treeState, null, 2));
-  const [selectedPath, setSelectedPath] = useState<Path | null>([]);
+  const [selectedPath, setSelectedPath] = useState<Path | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Auto-slug generator when title changes (if not editing and id was empty or matches previous slug)
@@ -273,8 +273,10 @@ export default function CreatePage() {
   };
 
   const handleDeleteNode = (path: Path) => {
+    if (path.length === 0) return;
+
     const next = deleteNode(treeState, path);
-    setSelectedPath([]);
+    setSelectedPath(null);
     syncTreeToJSON(next);
   };
 
@@ -297,7 +299,7 @@ export default function CreatePage() {
     const template = TEMPLATES.find((t) => t.id === templateId);
     if (template) {
       syncTreeToJSON(template.definition as WidgetNode);
-      setSelectedPath([]);
+      setSelectedPath(null);
     }
   };
 
