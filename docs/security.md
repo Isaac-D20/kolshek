@@ -35,7 +35,7 @@ The `kolshek query` command enforces read-only access:
 
 The settings dashboard (`kolshek dashboard`) runs a local HTTP server with multiple protections:
 
-- **Localhost only** — `Bun.serve()` binds to `hostname: "localhost"`, preventing LAN access
+- **Session authentication** — dashboard API requests require a session token and authenticated cookie
 - **CSRF protection** — Origin header checked on all non-GET/HEAD requests; mismatches return 403
 - **Security headers** — `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY`
 - **XSS prevention** — all user-controlled content is HTML-escaped before rendering (toast messages, SSE events, form values)

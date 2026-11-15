@@ -1,5 +1,5 @@
 // API response types — client-side copies of server types.
-// These must NOT import bun:sqlite or any server-side modules.
+// These must NOT import database or other server-side modules.
 
 export interface Provider {
   id: number;

@@ -1,7 +1,7 @@
 /**
  * Seed script — populates the DB with realistic test data.
  *
- * Usage: bun run scripts/seed-test-data.ts [--clear]
+ * Usage: npx tsx scripts/seed-test-data.ts [--clear]
  *
  * Creates:
  *   - 1 bank provider (Bank Hapoalim) with 1 checking account
@@ -352,8 +352,8 @@ db.prepare("UPDATE providers SET last_synced_at = $now WHERE id = $id")
 console.log("Created sync log entries.");
 
 console.log("\nDone! Test data ready. Try:");
-console.log("  bun run dev -- providers list");
-console.log("  bun run dev -- transactions list");
-console.log("  bun run dev -- transactions list --from 30d");
-console.log("  bun run dev -- reports monthly");
-console.log("  bun run dev -- reports categories");
+console.log("  npm run dev -- providers list");
+console.log("  npm run dev -- transactions list");
+console.log("  npm run dev -- transactions list --from 30d");
+console.log("  npm run dev -- reports monthly");
+console.log("  npm run dev -- reports categories");

@@ -31,9 +31,6 @@ src/web/web-files.ts
 # React dashboard build output
 src/web/dist/app/
 
-# Bun
-bun.lock
-
 !.env.schema
 
 .dev.vars

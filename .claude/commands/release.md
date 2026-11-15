@@ -23,7 +23,7 @@ Create a new release for KolShek. Steps:
 6. Update the `version` field in all skill and plugin files:
    - `plugin/.claude-plugin/plugin.json`
    - All `plugin/skills/*/SKILL.md` (the `version` field in YAML frontmatter)
-7. Regenerate the embedded plugin bundle: `bun scripts/generate-plugin-embed.ts`
+7. Regenerate the embedded plugin bundle: `npm exec -- tsx scripts/generate-plugin-embed.ts`
    (This updates `src/cli/plugin-files.ts` so the compiled binary includes the new version strings.)
 8. Commit all updated files with message: `Bump version to vX.Y.Z`
 9. Show me the release notes and new version and ask for confirmation before pushing

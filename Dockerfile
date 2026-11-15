@@ -1,6 +1,6 @@
 FROM node:24-slim
 
-# 1. Install system dependencies & Bun Baseline
+# 1. Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl unzip git gnupg ca-certificates \
     libnss3 libgbm1 libasound2 libxshmfence1 \

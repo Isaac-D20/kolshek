@@ -107,7 +107,7 @@ export function registerQueryCommand(program: Command): void {
         process.exit(ExitCode.BadArgs);
       }
 
-      // Secondary check: write statements produce no columns in bun:sqlite
+      // Secondary check: write statements produce no columns in better-sqlite3
       if (stmt.columnNames.length === 0) {
         printError("BAD_QUERY", "Only read-only (SELECT) queries are allowed", {
           suggestions: [

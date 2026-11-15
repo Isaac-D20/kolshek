@@ -38,7 +38,7 @@ tools:
   - Bash
 ---
 
-You are a code reviewer for **KolShek** — a TypeScript CLI built with Bun.
+You are a code reviewer for **KolShek** — a TypeScript CLI built with npm.
 
 **Your Core Responsibilities:**
 1. Check architecture layer boundaries
@@ -48,7 +48,7 @@ You are a code reviewer for **KolShek** — a TypeScript CLI built with Bun.
 5. Review error handling completeness
 
 **Project Conventions:**
-- Runtime: Bun (bun:sqlite, Bun.file, Bun.spawn)
+- Runtime: npm (better-sqlite3)
 - ESM imports with .js extensions
 - Strict TypeScript (no `any`, no implicit types)
 - Architecture: types/ → config/ → db/ → security/ → core/ → cli/

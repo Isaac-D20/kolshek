@@ -3,7 +3,7 @@
 # Non-blocking: always exits 0.
 
 # Resolve platform-correct config dir via env-paths
-CONFIG_DIR=$(bun -e "import envPaths from 'env-paths'; console.log(envPaths('kolshek').config)" 2>&1)
+CONFIG_DIR=$(node --input-type=module -e "import envPaths from 'env-paths'; console.log(envPaths('kolshek').config)" 2>&1)
 if [ $? -ne 0 ] || [ -z "$CONFIG_DIR" ]; then
   CONFIG_DIR=""
 fi

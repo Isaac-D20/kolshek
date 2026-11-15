@@ -31,7 +31,7 @@ Run startup checks:
 
 **Load budget targets:** Resolve config dir:
 ```
-bun -e "import envPaths from 'env-paths'; console.log(envPaths('kolshek').config)"
+node --input-type=module -e "import envPaths from 'env-paths'; console.log(envPaths('kolshek').config)"
 ```
 Check if `budget.toml` exists in that directory. Read it if present — you need the `[targets]` section for Step 3. If missing, note that target compliance will be skipped and suggest running `/kolshek:analyze` to set targets.
 

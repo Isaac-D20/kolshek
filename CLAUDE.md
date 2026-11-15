@@ -5,14 +5,14 @@ Israeli finance CLI (fork of upstream `DaveDushi/kolshek`) — scrapes banks/cre
 ## Commands
 
 ```
-bun run dev -- <command>    # Run CLI in dev
-bun test                    # Run vitest
-bun run typecheck           # tsc --noEmit
+npm run dev -- <command>    # Run CLI in dev
+npm test                    # Run vitest
+npm run typecheck           # tsc --noEmit
 ```
 
 ## Non-obvious conventions
 
-- **Runtime is Bun** — use `bun:sqlite` (not better-sqlite3), `Bun.file()`, `Bun.spawn()`
+- **Runtime is Node.js** — use `better-sqlite3` and Node.js APIs
 - **ESM with .js extensions** — all imports use `.js` even for `.ts` files
 - **core/ is pure** — `src/core/` must NOT import from `cli/` or `db/`. It operates on plain types only. This enables future MCP server / web UI without refactoring
 - **Dedup hashes** — `transactionHash` uses Caspion-compatible format (date rounded to minute + chargedAmount + description + memo + companyId + accountNumber). Don't change the hash formula without migration
@@ -22,4 +22,4 @@ bun run typecheck           # tsc --noEmit
 - **All commands support `--json`** — output uses `{ success, data, metadata }` envelope. Errors use `{ success: false, error: { code, message, retryable, suggestions } }`
 - **Exit codes** — 0=success, 1=error, 2=bad args, 3=auth failure, 4=timeout, 5=blocked, 10=partial success
 - **Date input** — CLI accepts YYYY-MM-DD, DD/MM/YYYY, or relative "30d"
-- **DB params** — bun:sqlite uses `$name` syntax: `db.prepare("... WHERE id = $id").get({ $id: 1 })`
+- **DB params** — `better-sqlite3` uses `$name` syntax: `db.prepare("... WHERE id = $id").get({ $id: 1 })`

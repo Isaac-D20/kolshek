@@ -47,7 +47,7 @@ This opens a local web server (default: `http://localhost:45091`) with a React S
 
 The dashboard is built with:
 
-- **Bun.serve()** — lightweight HTTP server bound to localhost (127.0.0.1)
+- **Express** — Node.js HTTP server with session authentication
 - **React** — full SPA with client-side routing via react-router
 - **Tailwind CSS v4** — utility-first styling with Recharts for data visualization
 - **SSE** — real-time per-provider sync progress streaming
