@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router";
 import {
   Save,
@@ -11,8 +11,7 @@ import {
   Eye,
   Sliders,
   AlertCircle,
-  CheckCircle2,
-  Undo2,
+  CheckCircle2
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { PageHeader } from "@/components/shared/page-header";
@@ -32,7 +31,7 @@ import { useCreatePage, useUpdatePage } from "@/hooks/use-custom-pages";
 import { WidgetReference } from "@/components/custom-page/widget-reference";
 import { CustomPageRenderer } from "@/components/custom-page/custom-page-renderer";
 import { validatePage } from "../../../core/page-schema";
-import { ICON_MAP } from "@/lib/icon-map";
+import { ICON_MAP, getIcon } from "@/lib/icon-map";
 
 import { ComponentTray } from "@/components/custom-page/builder/component-tray";
 import { VisualCanvas } from "@/components/custom-page/builder/visual-canvas";
@@ -450,11 +449,17 @@ export default function CreatePage() {
                 <SelectValue placeholder="Icon..." />
               </SelectTrigger>
               <SelectContent className="max-h-[220px]">
-                {Object.keys(ICON_MAP).map((iconName) => (
-                  <SelectItem key={iconName} value={iconName}>
-                    {iconName}
-                  </SelectItem>
-                ))}
+                {Object.keys(ICON_MAP).map((iconName) => {
+                  const Icon = getIcon(iconName);
+                  return (
+                      <SelectItem key={iconName} value={iconName}>
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 shrink-0 transition-colors duration-150" />
+                          <span>{iconName}</span>
+                        </span>
+                      </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

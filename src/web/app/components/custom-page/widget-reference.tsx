@@ -326,6 +326,22 @@ const QUERY_DOCS: Record<string, DocItem> = {
       type: "budget_vs_actual",
       month: "2026-01"
     }
+  },
+  "net_worth": {
+    name: "Net Worth Query",
+    description: "Reconstructs historical net worth over time using current account balances and transaction history.",
+    props: [
+      { name: "type", type: "string", description: "Must be 'net_worth'", required: true },
+      { name: "interval", type: "string", description: "Time bucket size", options: ["day", "week", "month"] },
+      { name: "from", type: "string", description: "Start date (YYYY-MM-DD or YYYY-MM)" },
+      { name: "to", type: "string", description: "End date (YYYY-MM-DD or YYYY-MM)" },
+      { name: "accounts", type: "string[]", description: "Filter by specific account numbers" },
+      { name: "filters", type: "Filters", description: "Query filters" },
+    ],
+    example: {
+      type: "net_worth",
+      interval: "month"
+    }
   }
 };
 
