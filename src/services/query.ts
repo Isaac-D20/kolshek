@@ -425,6 +425,333 @@ function executeBudgetVsActualQuery(query: Extract<WidgetQuery, { type: "budget_
 }
 
 // ---------------------------------------------------------------------------
+// Net Worth history resolver
+// ---------------------------------------------------------------------------
+
+export interface NetWorthPoint {
+  date: string;
+  value: number;
+  complete: boolean;
+}
+
+export interface NetWorthResult {
+  points: NetWorthPoint[];
+  currency: string;
+  coverage: {
+    from: string;
+    through: string;
+    partialAccounts: string[];
+  };
+}
+
+function getSqliteWeekKey(d: Date): string {
+  const year = d.getUTCFullYear();
+  const firstDayOfYear = new Date(Date.UTC(year, 0, 1));
+  const jan1Day = firstDayOfYear.getUTCDay();
+  const dayOfYear = Math.floor((d.getTime() - firstDayOfYear.getTime()) / 86400000);
+  const daysToFirstMonday = (8 - jan1Day) % 7;
+  let weekNum = 0;
+  if (dayOfYear >= daysToFirstMonday) {
+    weekNum = Math.floor((dayOfYear - daysToFirstMonday) / 7) + 1;
+  }
+  return `${year}-W${String(weekNum).padStart(2, "0")}`;
+}
+
+function generateNetWorthPeriods(
+  fromStr: string,
+  toStr: string,
+  interval: "day" | "week" | "month",
+): Array<{ key: string; startDate: string; cutoffDate: string }> {
+  const normFrom = fromStr.length === 7 ? `${fromStr}-01` : fromStr.slice(0, 10);
+  let normTo = toStr.slice(0, 10);
+  if (toStr.length === 7) {
+    const [y, m] = toStr.split("-").map(Number);
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    normTo = `${toStr}-${String(lastDay).padStart(2, "0")}`;
+  }
+
+  const fromDate = new Date(`${normFrom}T00:00:00.000Z`);
+  const toDate = new Date(`${normTo}T00:00:00.000Z`);
+
+  if (fromDate > toDate) {
+    return [];
+  }
+
+  if (interval === "month") {
+    const startYear = parseInt(normFrom.slice(0, 4), 10);
+    const startMonth = parseInt(normFrom.slice(5, 7), 10);
+    const endYear = parseInt(normTo.slice(0, 4), 10);
+    const endMonth = parseInt(normTo.slice(5, 7), 10);
+
+    const periods: Array<{ key: string; startDate: string; cutoffDate: string }> = [];
+    let curY = startYear;
+    let curM = startMonth;
+
+    while (curY < endYear || (curY === endYear && curM <= endMonth)) {
+      const mStr = String(curM).padStart(2, "0");
+      const key = `${curY}-${mStr}`;
+      const startDate = `${key}-01T00:00:00.000Z`;
+      const lastDay = new Date(Date.UTC(curY, curM, 0)).getUTCDate();
+      const cutoffDate = `${key}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`;
+      periods.push({ key, startDate, cutoffDate });
+
+      curM++;
+      if (curM > 12) {
+        curM = 1;
+        curY++;
+      }
+    }
+    return periods;
+  }
+
+  if (interval === "day") {
+    const periods: Array<{ key: string; startDate: string; cutoffDate: string }> = [];
+    const cur = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), fromDate.getUTCDate()));
+    const end = new Date(Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), toDate.getUTCDate()));
+
+    while (cur <= end) {
+      const y = cur.getUTCFullYear();
+      const m = String(cur.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(cur.getUTCDate()).padStart(2, "0");
+      const key = `${y}-${m}-${d}`;
+      periods.push({
+        key,
+        startDate: `${key}T00:00:00.000Z`,
+        cutoffDate: `${key}T23:59:59.999Z`,
+      });
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return periods;
+  }
+
+  // interval === "week"
+  const periodsMap = new Map<string, { key: string; startDate: string; cutoffDate: string }>();
+  const cur = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), fromDate.getUTCDate()));
+  const end = new Date(Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), toDate.getUTCDate()));
+
+  while (cur <= end) {
+    const key = getSqliteWeekKey(cur);
+    const y = cur.getUTCFullYear();
+    const m = String(cur.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(cur.getUTCDate()).padStart(2, "0");
+    const dateStr = `${y}-${m}-${d}`;
+
+    const existing = periodsMap.get(key);
+    if (!existing) {
+      periodsMap.set(key, {
+        key,
+        startDate: `${dateStr}T00:00:00.000Z`,
+        cutoffDate: `${dateStr}T23:59:59.999Z`,
+      });
+    } else {
+      existing.cutoffDate = `${dateStr}T23:59:59.999Z`;
+    }
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+
+  return Array.from(periodsMap.values());
+}
+
+function executeNetWorthQuery(query: Extract<WidgetQuery, { type: "net_worth" }>): NetWorthResult {
+  const db = getDatabase();
+  const interval = query.interval ?? "month";
+
+  // Determine date bounds
+  let from: string;
+  let to: string;
+
+  if (query.from && query.to) {
+    from = query.from;
+    to = query.to;
+  } else if (query.filters?.period) {
+    const parsed = parsePeriod(query.filters.period);
+    from = parsed.from ?? "";
+    to = parsed.to ?? "";
+  } else if (query.from) {
+    from = query.from;
+    const now = new Date();
+    to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  } else if (query.to) {
+    to = query.to;
+    const toDate = new Date(to.length === 7 ? `${to}-01` : to);
+    if (interval === "day") {
+      const fromDate = new Date(toDate);
+      fromDate.setDate(fromDate.getDate() - 30);
+      from = fromDate.toISOString().slice(0, 10);
+    } else if (interval === "week") {
+      const fromDate = new Date(toDate);
+      fromDate.setDate(fromDate.getDate() - 84);
+      from = fromDate.toISOString().slice(0, 10);
+    } else {
+      const fromDate = new Date(toDate);
+      fromDate.setFullYear(fromDate.getFullYear() - 1);
+      from = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, "0")}-01`;
+    }
+  } else {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    to = todayStr;
+    if (interval === "day") {
+      const fromDate = new Date(now);
+      fromDate.setDate(fromDate.getDate() - 30);
+      from = fromDate.toISOString().slice(0, 10);
+    } else if (interval === "week") {
+      const fromDate = new Date(now);
+      fromDate.setDate(fromDate.getDate() - 84);
+      from = fromDate.toISOString().slice(0, 10);
+    } else {
+      const fromDate = new Date(now);
+      fromDate.setMonth(fromDate.getMonth() - 11);
+      from = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, "0")}-01`;
+    }
+  }
+
+  const targetAccounts = query.accounts ?? query.filters?.account;
+  const currency = "ILS";
+
+  let accountSql = `
+    SELECT
+      a.id,
+      a.account_number,
+      a.balance,
+      a.currency,
+      (SELECT MIN(t.date) FROM transactions t WHERE t.account_id = a.id AND t.status = 'completed') AS earliest_date
+    FROM accounts a
+    JOIN providers p ON a.provider_id = p.id
+    WHERE a.excluded = 0
+      AND a.balance IS NOT NULL
+      AND a.currency = $currency
+  `;
+
+  const accountParams: Record<string, unknown> = { currency };
+
+  if (targetAccounts && targetAccounts.length > 0) {
+    const placeholders = targetAccounts.map((_, i) => `$acc_${i}`).join(", ");
+    accountSql += ` AND a.account_number IN (${placeholders})`;
+    targetAccounts.forEach((acc, i) => {
+      accountParams[`acc_${i}`] = acc;
+    });
+  }
+
+  const eligibleAccounts = db.prepare(accountSql).all(accountParams) as Array<{
+    id: number;
+    account_number: string;
+    balance: number;
+    currency: string;
+    earliest_date: string | null;
+  }>;
+
+  if (eligibleAccounts.length === 0) {
+    return {
+      points: [],
+      currency,
+      coverage: {
+        from,
+        through: to,
+        partialAccounts: [],
+      },
+    };
+  }
+
+  const accountIds = eligibleAccounts.map((a) => a.id);
+  const accountPlaceholders = accountIds.map((_, i) => `$id_${i}`).join(", ");
+  const txParams: Record<string, unknown> = {};
+  accountIds.forEach((id, i) => {
+    txParams[`id_${i}`] = id;
+  });
+
+  const txSql = `
+    SELECT
+      t.account_id,
+      t.date,
+      t.charged_amount
+    FROM transactions t
+    WHERE t.account_id IN (${accountPlaceholders})
+      AND t.status = 'completed'
+    ORDER BY t.date ASC
+  `;
+
+  const transactions = db.prepare(txSql).all(txParams) as Array<{
+    account_id: number;
+    date: string;
+    charged_amount: number;
+  }>;
+
+  const txByAccount = new Map<number, Array<{ date: string; amount: number }>>();
+  for (const acc of eligibleAccounts) {
+    txByAccount.set(acc.id, []);
+  }
+  for (const tx of transactions) {
+    const list = txByAccount.get(tx.account_id);
+    if (list) {
+      list.push({ date: tx.date, amount: tx.charged_amount });
+    }
+  }
+
+  const initialBalanceByAccount = new Map<number, number>();
+  for (const acc of eligibleAccounts) {
+    const txList = txByAccount.get(acc.id) ?? [];
+    const totalTxSum = txList.reduce((sum, t) => sum + t.amount, 0);
+    initialBalanceByAccount.set(acc.id, acc.balance - totalTxSum);
+  }
+
+  const periods = generateNetWorthPeriods(from, to, interval);
+  const points: NetWorthPoint[] = [];
+  const partialAccountsSet = new Set<string>();
+
+  const txPointerByAccount = new Map<number, number>();
+  const runningSumByAccount = new Map<number, number>();
+  for (const acc of eligibleAccounts) {
+    txPointerByAccount.set(acc.id, 0);
+    runningSumByAccount.set(acc.id, 0);
+  }
+
+  for (const period of periods) {
+    let totalNetWorth = 0;
+    let periodComplete = true;
+
+    for (const acc of eligibleAccounts) {
+      const txList = txByAccount.get(acc.id) ?? [];
+      let ptr = txPointerByAccount.get(acc.id) ?? 0;
+      let runningSum = runningSumByAccount.get(acc.id) ?? 0;
+
+      while (ptr < txList.length && txList[ptr].date <= period.cutoffDate) {
+        runningSum += txList[ptr].amount;
+        ptr++;
+      }
+
+      txPointerByAccount.set(acc.id, ptr);
+      runningSumByAccount.set(acc.id, runningSum);
+
+      const initBal = initialBalanceByAccount.get(acc.id) ?? 0;
+      const accBalanceAtCutoff = initBal + runningSum;
+      totalNetWorth += accBalanceAtCutoff;
+
+      if (acc.earliest_date && acc.earliest_date > period.cutoffDate) {
+        periodComplete = false;
+        partialAccountsSet.add(acc.account_number);
+      }
+    }
+
+    points.push({
+      date: period.key,
+      value: Math.round(totalNetWorth * 100) / 100,
+      complete: periodComplete,
+    });
+  }
+
+  return {
+    points,
+    currency,
+    coverage: {
+      from,
+      through: to,
+      partialAccounts: Array.from(partialAccountsSet),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -437,6 +764,7 @@ export function executeQuery(query: WidgetQuery): QueryResult {
     case "transactions": return executeTransactionsQuery(query);
     case "balances": return executeBalancesQuery(query);
     case "budget_vs_actual": return executeBudgetVsActualQuery(query);
+    case "net_worth": return executeNetWorthQuery(query);
   }
 }
 

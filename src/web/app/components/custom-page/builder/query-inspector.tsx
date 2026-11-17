@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Database, Filter, Layers, ArrowUpDown, Calendar } from "lucide-react";
 
 export interface QueryObject {
-  type: "aggregate" | "trend" | "transactions" | "balances" | "budget_vs_actual";
+  type: "aggregate" | "trend" | "transactions" | "balances" | "budget_vs_actual" | "net_worth";
   groupBy?: string | null;
   metric?: "sum" | "avg" | "count" | "min" | "max";
   field?: "chargedAmount" | "originalAmount";
@@ -22,6 +22,9 @@ export interface QueryObject {
   interval?: "day" | "week" | "month";
   series?: "total" | "category" | "merchant";
   month?: string;
+  from?: string;
+  to?: string;
+  accounts?: string[];
   filters?: {
     period?: string;
     direction?: "expense" | "income" | "all";
@@ -79,6 +82,12 @@ export function QueryInspector({ title = "Data Query", query, onChange }: QueryI
         onChange({
           type: "budget_vs_actual",
           filters: currentQuery.filters,
+        });
+        break;
+      case "net_worth":
+        onChange({
+          type: "net_worth",
+          interval: "month",
         });
         break;
     }
@@ -141,6 +150,7 @@ export function QueryInspector({ title = "Data Query", query, onChange }: QueryI
             <SelectItem value="transactions">Transactions (Itemized list)</SelectItem>
             <SelectItem value="balances">Account Balances</SelectItem>
             <SelectItem value="budget_vs_actual">Budget vs. Actual</SelectItem>
+            <SelectItem value="net_worth">Net Worth History</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -342,8 +352,50 @@ export function QueryInspector({ title = "Data Query", query, onChange }: QueryI
         </div>
       )}
 
+      {/* Net Worth Controls */}
+      {currentQuery.type === "net_worth" && (
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">Interval</Label>
+            <Select
+              value={currentQuery.interval || "month"}
+              onValueChange={(val) => updateField("interval", val)}
+            >
+              <SelectTrigger className="h-8 text-xs bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">Day</SelectItem>
+                <SelectItem value="week">Week</SelectItem>
+                <SelectItem value="month">Month</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">From (YYYY-MM-DD)</Label>
+            <Input
+              placeholder="e.g. 2025-01-01"
+              className="h-8 text-xs bg-background"
+              value={(currentQuery.from as string) || ""}
+              onChange={(e) => updateField("from", e.target.value || undefined)}
+            />
+          </div>
+
+          <div className="col-span-2 space-y-1">
+            <Label className="text-[11px] text-muted-foreground">To (YYYY-MM-DD)</Label>
+            <Input
+              placeholder="e.g. 2026-11-17"
+              className="h-8 text-xs bg-background"
+              value={(currentQuery.to as string) || ""}
+              onChange={(e) => updateField("to", e.target.value || undefined)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Filter Section */}
-      {currentQuery.type !== "balances" && (
+      {currentQuery.type !== "balances" && currentQuery.type !== "net_worth" && (
         <div className="pt-2 border-t border-border/60 space-y-2.5">
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
             <Filter className="h-3 w-3" />

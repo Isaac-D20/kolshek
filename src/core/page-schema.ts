@@ -73,12 +73,22 @@ const budgetVsActualQuerySchema = z.object({
   filters: filtersSchema,
 });
 
+const netWorthQuerySchema = z.object({
+  type: z.literal("net_worth"),
+  interval: z.enum(["day", "week", "month"]).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  accounts: z.array(z.string()).optional(),
+  filters: filtersSchema,
+});
+
 export const querySchema = z.discriminatedUnion("type", [
   aggregateQuerySchema,
   trendQuerySchema,
   transactionsQuerySchema,
   balancesQuerySchema,
   budgetVsActualQuerySchema,
+  netWorthQuerySchema,
 ]);
 
 export type WidgetQuery = z.infer<typeof querySchema>;
