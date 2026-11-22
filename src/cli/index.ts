@@ -23,6 +23,7 @@ import { registerReportsCommand } from "./commands/reports.js";
 import { registerCategorizeCommand } from "./commands/categorize.js";
 import { registerTranslateCommand } from "./commands/translate.js";
 import { registerScheduleCommand } from "./commands/schedule.js";
+import { restoreSchedule } from "../config/schedule.js";
 import { registerPluginCommand } from "./commands/plugin.js";
 import { registerSpendingCommand } from "./commands/spending.js";
 import { registerIncomeCommand } from "./commands/income.js";
@@ -87,6 +88,9 @@ program
       await ensureDirectories();
       const dbPath = getDbPath();
       initDatabase(dbPath);
+
+      // Restore OS schedule task if it was lost (e.g., after a reboot)
+      await restoreSchedule();
 
       // First-run detection: check for config file, not just directory
       const paths = getAppPaths();
