@@ -8,7 +8,7 @@ import { unlink } from "node:fs/promises";
 import { readFile, writeFile, fileExists } from "../cli/file-utils.js";
 import type { ScheduleConfig } from "../types/index.js";
 import { getAppPaths } from "./loader.js";
-import { run } from "../core/scheduler/index.js";
+import { run, registerSchedule, checkScheduleRegistered } from "../core/scheduler/index.js";
 
 export function scheduleJsonPath(): string {
   const paths = getAppPaths();
@@ -101,4 +101,38 @@ export async function resolveBinaryPath(): Promise<string> {
   }
 
   return process.execPath;
+}
+
+/**
+ * Restore a previously registered schedule after a reboot.
+ * If schedule.json exists but the OS task is not registered (e.g., after
+ * a system reboot that cleared the OS scheduler), re-register the task
+ * silently so the user's scheduling preference persists across reboots.
+ *
+ * Returns true if the schedule was restored, false otherwise.
+ */
+export async function restoreSchedule(): Promise<boolean> {
+  const saved = await readScheduleConfig();
+  if (saved === null) {
+    // No saved config — nothing to restore
+    return false;
+  }
+
+  const osRegistered = await checkScheduleRegistered();
+  if (osRegistered) {
+    // OS task already exists — nothing to do
+    return false;
+  }
+
+  // Config exists but OS task is missing — re-register it
+  try {
+    await registerSchedule(saved);
+    console.error(`[kolshek] Restored scheduled fetch task (every ${saved.intervalHours}h).`);
+    return true;
+  } catch (err) {
+    console.error(
+      `[kolshek] Failed to restore scheduled fetch task: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
 }

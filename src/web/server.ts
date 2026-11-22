@@ -47,6 +47,7 @@ import { PROVIDERS } from "../types/provider.js";
 import { storeCredentials, deleteCredentials, hasCredentials } from "../security/keychain.js";
 import {
   readScheduleConfig, writeScheduleConfig, deleteScheduleConfig, resolveBinaryPath,
+  restoreSchedule,
 } from "../config/schedule.js";
 import {
   registerSchedule, unregisterSchedule, checkScheduleRegistered, currentPlatform,
@@ -404,6 +405,11 @@ export function startDashboard(port: number) {
   const authDisabled = process.env.KOLSHEK_DISABLE_AUTH === "1";
   const sessionToken = randomBytes(32).toString("hex");
   const cookieName = "kolshek_session";
+
+  // Restore OS schedule task if it was lost (e.g., after a reboot)
+  restoreSchedule().catch((err) => {
+    console.error("[kolshek] Failed to restore schedule on server start:", err);
+  });
 
   app.use(cors({ origin: true, credentials: true }));
   app.use(cookieParser());
